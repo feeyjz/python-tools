@@ -5742,16 +5742,24 @@ class GoldMonitor:
             pass
 
     def _change_colors(self, pct):
-        """根据涨跌幅分级返回价格颜色：暴涨深红 / 小涨浅红 / 震荡灰白 / 大跌深绿 / 小跌浅绿"""
+        """根据涨跌幅逐级加深着色：每跨过 1% 红/绿加深一档，0% 灰，±1% 内极浅"""
+        # 涨跌幅绝对值对应的颜色档位（1%~9%+ 逐级加深）
+        UP_SCALE = ["#FFB3B3", "#FF8A80", "#FF6666", "#FF4444", "#FF1744",
+                    "#E0001B", "#C20000", "#950000", "#660000"]   # 涨：浅→深红
+        DOWN_SCALE = ["#C8E6C9", "#A5D6A7", "#81C784", "#66BB6A", "#4CAF50",
+                      "#2E7D32", "#1B5E20", "#0d4d1a", "#063d10"]  # 跌：浅→深绿
+        if pct == 0:
+            return "#888888"            # 震荡：灰色
         if pct > 0:
-            if pct >= 1.0:
-                return "#FF1744"   # 暴涨：深红
-            return "#FF8A80"       # 小涨：浅红
-        if pct < 0:
-            if pct <= -1.0:
-                return "#00C853"   # 大跌：深绿
-            return "#A5D6A7"       # 小跌：浅绿
-        return "#888888"           # 震荡：灰色
+            if pct < 1.0:
+                return "#FFD0D0"        # 微涨：极浅红
+            idx = min(int(pct), 9) - 1  # 1%→0, 9%+→8
+            return UP_SCALE[idx]
+        else:
+            if pct > -1.0:
+                return "#D6EFD6"        # 微跌：极浅绿
+            idx = min(int(-pct), 9) - 1
+            return DOWN_SCALE[idx]
 
     def _signal_advice(self, ana):
         """把缠论信号归纳为买卖机会，用不同颜色体现"""
