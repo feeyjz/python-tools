@@ -1,0 +1,172 @@
+{
+  "sz160723": {
+    "cost_price": 0,
+    "shares": 0,
+    "cash": 10000,
+    "initial_capital": 10000,
+    "realized_pnl": 0,
+    "max_price": 0,
+    "trade_count": 0,
+    "last_action": "持有",
+    "buy_date": "",
+    "entry_info": {}
+  },
+  "sz001337": {
+    "cost_price": 0,
+    "shares": 0,
+    "cash": 10000,
+    "initial_capital": 10000,
+    "realized_pnl": 0,
+    "max_price": 0,
+    "trade_count": 0,
+    "last_action": "持有",
+    "buy_date": "",
+    "entry_info": {}
+  },
+  "sh600988": {
+    "cost_price": 0,
+    "shares": 0,
+    "cash": 10000,
+    "initial_capital": 10000,
+    "realized_pnl": 0,
+    "max_price": 0,
+    "trade_count": 0,
+    "last_action": "持有",
+    "buy_date": "",
+    "entry_info": {}
+  },
+  "sz002716": {
+    "cost_price": 0,
+    "shares": 0,
+    "cash": 10000,
+    "initial_capital": 10000,
+    "realized_pnl": 0,
+    "max_price": 0,
+    "trade_count": 0,
+    "last_action": "持有",
+    "buy_date": "",
+    "entry_info": {}
+  },
+  "hf_XAG": {
+    "cost_price": 0,
+    "shares": 0,
+    "cash": 9948.81592,
+    "initial_capital": 10000,
+    "realized_pnl": -51.18407999999994,
+    "max_price": 0,
+    "trade_count": 2,
+    "last_action": "持有",
+    "buy_date": "",
+    "entry_info": {}
+  },
+  "sh601069": {
+    "cost_price": 0,
+    "shares": 0,
+    "cash": 10000,
+    "initial_capital": 10000,
+    "realized_pnl": 0,
+    "max_price": 0,
+    "trade_count": 0,
+    "last_action": "持有",
+    "buy_date": "",
+    "entry_info": {}
+  },
+  "au0": {
+    "cost_price": 0,
+    "shares": 0,
+    "cash": 9946.76992,
+    "initial_capital": 10000,
+    "realized_pnl": -53.230079999999816,
+    "max_price": 0,
+    "trade_count": 2,
+    "last_action": "持有",
+    "buy_date": "",
+    "entry_info": {}
+  },
+  "hf_CL": {
+    "cost_price": 100.160044,
+    "shares": 50,
+    "cash": 4991.9978,
+    "initial_capital": 10000,
+    "realized_pnl": 0,
+    "max_price": 100.173,
+    "trade_count": 1,
+    "last_action": "持有",
+    "buy_date": "2026-09-16",
+    "entry_info": {
+      "entry_time": "2026-09-16 14:23:34",
+      "entry_price": 99.761,
+      "entry_signal": "★二买",
+      "entry_mm_intention": "向上试盘",
+      "entry_mm_confidence": 0.4878048780487805,
+      "entry_resonance": ""
+    }
+  },
+  "sh601899": {
+    "cost_price": 0,
+    "shares": 0,
+    "cash": 10000,
+    "initial_capital": 10000,
+    "realized_pnl": 0,
+    "max_price": 0,
+    "trade_count": 0,
+    "last_action": "持有",
+    "buy_date": "",
+    "entry_info": {}
+  },
+  "ag0": {
+    "cost_price": 0,
+    "shares": 0,
+    "cash": 10000,
+    "initial_capital": 10000,
+    "realized_pnl": 0,
+    "max_price": 0,
+    "trade_count": 0,
+    "last_action": "持有",
+    "buy_date": "",
+    "entry_info": {}
+  },
+  "sc0": {
+    "cost_price": 698.282,
+    "shares": 2,
+    "cash": 8603.436,
+    "initial_capital": 10000,
+    "realized_pnl": 0,
+    "max_price": 905.0,
+    "trade_count": 1,
+    "last_action": "持有",
+    "buy_date": "2026-09-07",
+    "entry_info": {
+      "entry_time": "2026-09-07 11:16:21",
+      "entry_signal": "●偏多",
+      "entry_resonance": "",
+      "entry_mm_confidence": 0.19817073170731708,
+      "entry_price": 695.5,
+      "entry_mm_intention": "向上试盘"
+    }
+  },
+  "sz161226": {
+    "cost_price": 0,
+    "shares": 0,
+    "cash": 9906.196,
+    "initial_capital": 10000,
+    "realized_pnl": -93.804,
+    "max_price": 0,
+    "trade_count": 2,
+    "last_action": "持有",
+    "buy_date": "",
+    "entry_info": {}
+  },
+  "hf_XAU": {
+    "cost_price": 0,
+    "shares": 0,
+    "cash": 10000,
+    "initial_capital": 10000,
+    "realized_pnl": 0,
+    "max_price": 0,
+    "trade_count": 0,
+    "last_action": "持有",
+    "buy_date": "",
+    "entry_info": {}
+  }
+}

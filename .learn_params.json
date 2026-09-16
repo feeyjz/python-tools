@@ -1,0 +1,16 @@
+{
+  "last_update": "2026-09-14 16:48:21",
+  "total_trades_analyzed": 5,
+  "signal_adjustments": {
+    "●偏多": -0.223
+  },
+  "intention_adjustments": {},
+  "stop_loss_pct": -11,
+  "take_profit_1": 50,
+  "take_profit_2": 30,
+  "trailing_stop_pct": 8,
+  "breakeven_trigger": 15,
+  "buy_ratio_multiplier": 0.92,
+  "recent_win_rate": 0.0,
+  "recent_avg_pnl": -3.63
+}
