@@ -9,6 +9,7 @@
 
 import tkinter as tk
 from tkinter import messagebox, ttk
+import tkinter.font as tkfont
 import urllib.request
 import threading
 import time
@@ -4392,13 +4393,19 @@ class GoldMonitor:
     def __init__(self):
         self.root = tk.Tk()
         self.root.title("缠论黄金监控")
-        self.root.overrideredirect(True)
-        self.root.attributes("-topmost", True)
-        self.root.attributes("-alpha", 0.92)
+        # 改为普通桌面应用：使用系统标题栏，支持最小化/最大化/关闭，窗口可调大小
+        self.root.resizable(True, True)
+        self.root.attributes("-alpha", 1.0)
+        self.root.protocol("WM_DELETE_WINDOW", self._close)
         self.width = 1100
         self.height = 900
         sx = self.root.winfo_screenwidth()
         self.root.geometry(f"{self.width}x{self.height}+{sx - self.width - 20}+30")
+        # 列宽拖拽相关状态
+        self._resize_idx = None
+        self._row_keys = ["name", "price", "pct", "signal", "mm_intention", "pivot",
+                          "support", "resistance", "pred_h", "pred_d", "pos_cost",
+                          "pos_value", "pos_action", "pnl_label"]
 
         self.rt_data = {}       # 实时行情
         self.analysis = {}      # 缠论分析结果
@@ -4423,13 +4430,12 @@ class GoldMonitor:
         # 保存初始位置
         self.root.update_idletasks()
         self._saved_pos = (self.root.winfo_x(), self.root.winfo_y())
-        # 绑定窗口显示/隐藏事件（处理任务栏最小化/恢复）
-        self.root.bind("<Map>", self._on_restore)
-        self.root.bind("<Unmap>", self._on_minimize_taskbar)
         # 先启动实时行情更新
         self._start_rt_loop()
         # 延迟加载K线并计算缠论
         self.root.after(500, self._load_kline_and_analyze)
+        # 创建小型悬浮窗（现货黄金 + WTI原油 速览）
+        self._create_float_window()
 
     # ---- UI构建 ----
 
@@ -4443,24 +4449,8 @@ class GoldMonitor:
             self.main_frame = tk.Frame(self.root, bg=self.BG, relief="solid", bd=1,
                                        highlightbackground=self.BORDER, highlightthickness=1)
             self.main_frame.pack(fill="both", expand=True)
-        # 标题栏
-        title_bar = tk.Frame(self.main_frame, bg=self.TITLE_BG, height=32)
-        title_bar.pack(fill="x"); title_bar.pack_propagate(False)
-        title_bar.bind("<Button-1>", self._start_drag)
-        title_bar.bind("<B1-Motion>", self._do_drag)
-        tk.Label(title_bar, text="📊 缠论监控 v2.0", bg=self.TITLE_BG, fg="#FFD700",
-                 font=("Microsoft YaHei", 11, "bold")).pack(side="left", padx=8, pady=4)
-        self.time_label = tk.Label(title_bar, text="--:--:--", bg=self.TITLE_BG,
-                                   fg=self.FG_DIM, font=("Consolas", 9))
-        self.time_label.pack(side="left", padx=4)
-        bf = tk.Frame(title_bar, bg=self.TITLE_BG); bf.pack(side="right", padx=4)
-        tk.Button(bf, text="─", command=self._minimize, bg=self.TITLE_BG, fg=self.FG,
-                  font=("Consolas", 9), width=2, bd=0, activebackground="#333").pack(side="left", padx=1)
-        tk.Button(bf, text="✕", command=self._close, bg=self.TITLE_BG, fg="#FF6B6B",
-                  font=("Consolas", 9), width=2, bd=0, activebackground="#333").pack(side="left", padx=1)
-        # 标题栏下方金色装饰线
-        tk.Frame(self.main_frame, bg="#FFD700", height=2).pack(fill="x")
-        # 表头（字体与数据行逐列一致）
+        # （已改为普通窗口，使用系统标题栏，不再自定义标题栏）
+        # 表头（字体与数据行逐列一致；列宽可在表头分隔处拖拽调节）
         header = tk.Frame(self.main_frame, bg=self.BG_ROW, height=24)
         header.pack(fill="x"); header.pack_propagate(False)
         header_cols = [
@@ -4479,9 +4469,29 @@ class GoldMonitor:
             ("操作",   ("Microsoft YaHei", 8, "bold"),   8, 1),
             ("盈利",   ("Consolas", 8, "bold"),           9, 1),
         ]
-        for text, ft, w, px in header_cols:
-            tk.Label(header, text=text, bg=self.BG_ROW, fg="#FFD700",
-                     font=ft, width=w, anchor="w").pack(side="left", padx=px)
+        self.col_widths = [w for (_, _, w, _) in header_cols]
+        self.col_header = []
+        self.col_fonts = []
+        for i, (text, ft, w, px) in enumerate(header_cols):
+            lbl = tk.Label(header, text=text, bg=self.BG_ROW, fg="#FFD700",
+                           font=ft, width=w, anchor="w")
+            lbl.pack(side="left", padx=px)
+            self.col_header.append(lbl)
+            try:
+                self.col_fonts.append(tkfont.Font(
+                    family=ft[0], size=ft[1],
+                    weight=ft[2] if len(ft) > 2 else "normal"))
+            except Exception:
+                self.col_fonts.append(None)
+            # 列宽拖拽把手（最后一列后不添加）
+            if i < len(header_cols) - 1:
+                handle = tk.Frame(header, bg=self.BORDER, width=3,
+                                  cursor="sb_h_double_arrow")
+                handle.pack(side="left", fill="y")
+                handle.bind("<ButtonPress-1>",
+                            lambda e, idx=i: self._col_resize_start(e, idx))
+                handle.bind("<B1-Motion>", self._col_resize_drag)
+                handle.bind("<ButtonRelease-1>", self._col_resize_end)
         tk.Frame(self.main_frame, bg=self.BORDER, height=1).pack(fill="x")
         # 数据行
         self.data_frame = tk.Frame(self.main_frame, bg=self.BG)
@@ -4496,6 +4506,10 @@ class GoldMonitor:
         self.status_label = tk.Label(sb, text="正在加载K线数据...", bg=self.TITLE_BG,
                                      fg=self.FG_DIM, font=("Microsoft YaHei", 8), anchor="w")
         self.status_label.pack(side="left", padx=8)
+        # 时钟（原自定义标题栏移除后移至状态栏）
+        self.time_label = tk.Label(sb, text="--:--:--", bg=self.TITLE_BG,
+                                   fg=self.FG_DIM, font=("Consolas", 9))
+        self.time_label.pack(side="right", padx=8)
         self.pin_btn = tk.Button(sb, text="📌", command=self._toggle_pin, bg=self.TITLE_BG,
                                  fg="#FFD700", font=("", 9), width=2, bd=0, activebackground="#333")
         self.pin_btn.pack(side="right", padx=4)
@@ -5159,6 +5173,7 @@ class GoldMonitor:
         pcl = tk.Label(row, text="--", bg=bg, fg=self.FG, font=("Consolas", 9),
                        anchor="w", width=8); pcl.pack(side="left", padx=2, pady=6)
         sl_frame, sl = self._make_pill(row, "--", self.FG_DIM, bg)
+        sl.config(width=7)
         sl_frame.pack(side="left", padx=2, pady=6)
         # 主力意图
         mm_lbl = tk.Label(row, text="--", bg=bg, fg=self.FG_DIM, font=("Microsoft YaHei", 8),
@@ -5627,6 +5642,147 @@ class GoldMonitor:
             row["pos_cost"].config(text="--", fg=self.FG_DIM)
             row["pos_value"].config(text="--", fg=self.FG_DIM)
             row["pos_action"].config(text="--", fg=self.FG_DIM)
+        # 同步刷新悬浮窗（现货黄金 + WTI原油 速览）
+        self._update_float_window()
+
+    # ---- 列宽拖拽调节 ----
+    def _col_resize_start(self, event, idx):
+        self._resize_idx = idx
+        self._resize_start_x = event.x_root
+        self._resize_start_w = self.col_widths[idx]
+        fnt = self.col_fonts[idx] if idx < len(self.col_fonts) else None
+        try:
+            self._resize_char_px = max(4, fnt.measure("0"))
+        except Exception:
+            self._resize_char_px = 8
+
+    def _col_resize_drag(self, event):
+        if self._resize_idx is None:
+            return
+        try:
+            delta = event.x_root - self._resize_start_x
+            new_w = max(3, int(round(self._resize_start_w + delta / self._resize_char_px)))
+            self.col_widths[self._resize_idx] = new_w
+            self._apply_col_width(self._resize_idx)
+        except Exception:
+            pass
+
+    def _col_resize_end(self, event):
+        self._resize_idx = None
+
+    def _apply_col_width(self, idx):
+        w = self.col_widths[idx]
+        try:
+            self.col_header[idx].config(width=w)
+        except Exception:
+            pass
+        key = self._row_keys[idx]
+        for code, r in self.rows.items():
+            widget = r.get(key)
+            if widget:
+                try:
+                    widget.config(width=w)
+                except Exception:
+                    pass
+
+    # ---- 小型悬浮窗（现货黄金 + WTI原油 速览）----
+    def _create_float_window(self):
+        fw = tk.Toplevel(self.root)
+        fw.title("行情速览")
+        # 悬浮窗：无边框 + 置顶 + 半透明，可拖拽
+        fw.overrideredirect(True)
+        fw.attributes("-topmost", True)
+        fw.attributes("-alpha", 0.95)
+        fw.configure(bg="#1a1a2e")
+        fw.geometry("250x132+24+24")
+        self.float_win = fw
+        self._float_drag = {"x": 0, "y": 0}
+
+        bar = tk.Frame(fw, bg="#0f3460", height=22)
+        bar.pack(fill="x"); bar.pack_propagate(False)
+        tk.Label(bar, text="📈 行情速览", bg="#0f3460", fg="#FFD700",
+                 font=("Microsoft YaHei", 9, "bold")).pack(side="left", padx=6)
+        tk.Button(bar, text="×", command=fw.destroy, bg="#0f3460", fg="#FF6B6B",
+                  font=("Consolas", 10), width=2, bd=0,
+                  activebackground="#333").pack(side="right", padx=2)
+        bar.bind("<Button-1>", self._float_start_drag)
+        bar.bind("<B1-Motion>", self._float_do_drag)
+
+        body = tk.Frame(fw, bg="#1a1a2e")
+        body.pack(fill="both", expand=True, padx=8, pady=6)
+        self.float_rows = {}
+        for code, label in [("hf_XAU", "现货黄金"), ("hf_CL", "WTI原油")]:
+            r = tk.Frame(body, bg="#1a1a2e")
+            r.pack(fill="x", pady=4)
+            tk.Label(r, text=label, bg="#1a1a2e", fg="#FFD700",
+                     font=("Microsoft YaHei", 11, "bold"),
+                     width=8, anchor="w").pack(side="left")
+            price = tk.Label(r, text="--", bg="#1a1a2e", fg="#FFFFFF",
+                             font=("Consolas", 13, "bold"),
+                             width=9, anchor="e")
+            price.pack(side="left", padx=6)
+            pct = tk.Label(r, text="--", bg="#1a1a2e", fg="#888888",
+                           font=("Consolas", 9), width=9, anchor="e")
+            pct.pack(side="left", padx=2)
+            sig = tk.Label(r, text="—", bg="#1a1a2e", fg="#888888",
+                           font=("Microsoft YaHei", 9, "bold"),
+                           width=8, anchor="w")
+            sig.pack(side="left", padx=4)
+            self.float_rows[code] = {"price": price, "pct": pct, "sig": sig}
+
+    def _float_start_drag(self, event):
+        self._float_drag = {"x": event.x, "y": event.y}
+
+    def _float_do_drag(self, event):
+        try:
+            self.float_win.geometry(
+                f"+{self.float_win.winfo_x()+event.x-self._float_drag['x']}"
+                f"+{self.float_win.winfo_y()+event.y-self._float_drag['y']}")
+        except Exception:
+            pass
+
+    def _change_colors(self, pct):
+        """根据涨跌幅分级返回价格颜色：暴涨深红 / 小涨浅红 / 震荡灰白 / 大跌深绿 / 小跌浅绿"""
+        if pct > 0:
+            if pct >= 1.0:
+                return "#FF1744"   # 暴涨：深红
+            return "#FF8A80"       # 小涨：浅红
+        if pct < 0:
+            if pct <= -1.0:
+                return "#00C853"   # 大跌：深绿
+            return "#A5D6A7"       # 小跌：浅绿
+        return "#888888"           # 震荡：灰色
+
+    def _signal_advice(self, ana):
+        """把缠论信号归纳为买卖机会，用不同颜色体现"""
+        if not ana:
+            return "—", "#888888"
+        sig = ana.get("signal", "")
+        buy_kw = ("一买", "二买", "三买", "抢跑多", "强多", "偏多", "一买弱", "二买区")
+        sell_kw = ("一卖", "二卖", "三卖", "抢跑空", "强空", "偏空", "一卖弱")
+        if any(k in sig for k in buy_kw):
+            return "买入机会", "#FF9800"   # 橙
+        if any(k in sig for k in sell_kw):
+            return "卖出机会", "#2196F3"   # 蓝
+        return "观望", "#888888"
+
+    def _update_float_window(self):
+        if not hasattr(self, "float_win") or not self.float_win.winfo_exists():
+            return
+        for code, refs in self.float_rows.items():
+            data = self.rt_data.get(code)
+            if not data:
+                continue
+            price = data.get("price", 0)
+            pct = data.get("pct", 0)
+            refs["price"].config(text=fmt_price(price))
+            refs["pct"].config(text=f"{pct:+.2f}%")
+            color = self._change_colors(pct)
+            refs["price"].config(fg=color)
+            refs["pct"].config(fg=color)
+            ana = self.analysis.get(code)
+            sig_text, sig_color = self._signal_advice(ana)
+            refs["sig"].config(text=sig_text, fg=sig_color)
 
     # ---- Tooltip ----
 
@@ -5990,37 +6146,8 @@ class GoldMonitor:
         self.root.geometry(f"+{self.root.winfo_x()+event.x-self.drag_data['x']}+"
                            f"{self.root.winfo_y()+event.y-self.drag_data['y']}")
     def _minimize(self):
-        """自定义最小化按钮"""
-        if not self._minimized:
-            # 最小化：先保存当前位置（在改变geometry之前）
-            self.root.update_idletasks()
-            self._saved_pos = (self.root.winfo_x(), self.root.winfo_y())
-            self._minimized = True
-            # 隐藏主内容和底部元素
-            self.data_frame.pack_forget()
-            children = self.main_frame.winfo_children()
-            for w in children:
-                if w != children[0]:  # 保留标题栏
-                    w.pack_forget()
-            # 只改变高度，不改变位置
-            self.root.geometry(f"{self.width}x32+{self._saved_pos[0]}+{self._saved_pos[1]}")
-        else:
-            # 恢复
-            self._minimized = False
-            # 使用保存的位置
-            if self._saved_pos:
-                x, y = self._saved_pos
-            else:
-                # 如果没有保存位置，使用屏幕右上角
-                sx = self.root.winfo_screenwidth()
-                x = sx - self.width - 20
-                y = 30
-            self.root.geometry(f"{self.width}x{self.height}+{x}+{y}")
-            self.root.update_idletasks()
-            # 重建UI并刷新数据
-            self.rows = {}
-            self._build_ui()
-            self.root.after(100, self._refresh_all_data)
+        """最小化到任务栏（普通窗口使用系统最小化）"""
+        self.root.iconify()
 
     def _on_minimize_taskbar(self, event):
         """任务栏最小化时保存位置"""

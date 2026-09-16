@@ -1,0 +1,8 @@
+# Python 缓存
+__pycache__/
+*.pyc
+*.pyo
+
+# 本地运行数据（非源码）
+.kline_cache/
+.positions.json
