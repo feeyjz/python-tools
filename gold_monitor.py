@@ -4543,23 +4543,25 @@ class GoldMonitor:
                 self.sys_oil_lbl = read_lbl
             else:
                 self.sys_silver_lbl = read_lbl
-        # ③ 三张意图卡并排（图标 + 文案），填满宽度
-        self.sys_intent_lbls = []
-        intent_row = tk.Frame(sys_frame, bg="#10243a")
-        intent_row.pack(side="top", fill="x", padx=6, pady=(0, 4))
-        intent_icons = ["① 能源", "② 压制", "③ 叙事"]
-        for icon in intent_icons:
-            ic = tk.Frame(intent_row, bg="#16263c", relief="ridge", bd=1,
-                          highlightbackground="#4FC3F7", highlightthickness=1)
-            ic.pack(side="left", fill="both", expand=True, padx=3)
-            tk.Label(ic, text=icon, bg="#16263c", fg="#4FC3F7",
-                     font=("Microsoft YaHei", 8, "bold"), anchor="w").pack(
-                side="top", fill="x", padx=6, pady=(2, 0))
-            il = tk.Label(ic, text="--", bg="#16263c", fg="#888888",
-                          font=("Microsoft YaHei", 8), anchor="w",
-                          justify="left", wraplength=210)
-            il.pack(side="top", fill="x", padx=6, pady=(0, 4))
-            self.sys_intent_lbls.append(il)
+        # ③ 意图卡网格（最多 6 张 = 两行×三列），按优先级动态显示/隐藏
+        self.sys_intent_cards = []
+        intent_grid = tk.Frame(sys_frame, bg="#10243a")
+        intent_grid.pack(side="top", fill="x", padx=6, pady=(0, 4))
+        for _r in range(2):
+            row = tk.Frame(intent_grid, bg="#10243a")
+            row.pack(side="top", fill="x")
+            for _c in range(3):
+                ic = tk.Frame(row, bg="#16263c", relief="ridge", bd=1,
+                              highlightbackground="#4FC3F7", highlightthickness=1)
+                ic.pack(side="left", fill="both", expand=True, padx=3, pady=(0, 3))
+                cat_lbl = tk.Label(ic, text="—", bg="#16263c", fg="#4FC3F7",
+                                   font=("Microsoft YaHei", 8, "bold"), anchor="w")
+                cat_lbl.pack(side="top", fill="x", padx=6, pady=(2, 0))
+                il = tk.Label(ic, text="--", bg="#16263c", fg="#888888",
+                              font=("Microsoft YaHei", 8), anchor="w",
+                              justify="left", wraplength=210)
+                il.pack(side="top", fill="x", padx=6, pady=(0, 4))
+                self.sys_intent_cards.append((ic, cat_lbl, il))
         # 数据行
         self.data_frame = tk.Frame(self.main_frame, bg=self.BG)
         self.data_frame.pack(fill="both", expand=True)
@@ -5950,25 +5952,115 @@ class GoldMonitor:
         elif "一卖" in g_sig:
             status += "（黄金一卖：主脑反扑信号）"
 
-        # ---- 主脑三重意图（《世界假说》5.2 范式，实时化）----
+        # ---- 主脑意图池 ----
+        # 融合四类信号：①幅度分级 ②股票/内盘 vs 现货背离(抢跑) ③三大板块跨板块组合 ④波动强度
+        # 每条意图 = {cat: 分类图标名, text: 文案, color: 颜色, prio: 优先级(越小越重要)}
         intents = []
-        # 意图一：物理引擎（原油）调节
-        if o_pct <= -1.0:
-            intents.append(("主动切断战争副本能量·物理引擎降频止损", "#4FC3F7"))
+
+        def add_intent(cat, text, color, prio):
+            intents.append({"cat": cat, "text": text, "color": color, "prio": prio})
+
+        def pct_of(code):
+            return rt.get(code, {}).get("pct", 0)
+
+        def avg_pct(codes):
+            vals = [rt.get(c, {}).get("pct") for c in codes]
+            vals = [v for v in vals if v is not None]
+            return sum(vals) / len(vals) if vals else 0.0
+
+        # —— ① 能源：物理引擎（原油）按幅度分级 ——
+        if o_pct <= -3.0:
+            add_intent("⚡能源", "物理引擎深度降频·世界能耗冰封·主脑进入省电待机", "#4FC3F7", 1)
+        elif o_pct <= -1.0:
+            add_intent("⚡能源", "主动切断战争副本能量·物理引擎降频止损", "#4FC3F7", 3)
+        elif o_pct >= 3.0:
+            add_intent("⚡能源", "服务器严重过载·世界Boss战全面开启·底层能源被海量抽取", "#FF1744", 1)
         elif o_pct >= 1.0:
-            intents.append(("维持物理引擎高转·世界Boss战耗能", "#FF8A80"))
+            add_intent("⚡能源", "维持物理引擎高转·世界Boss战(地缘)持续耗能", "#FF8A80", 3)
         else:
-            intents.append(("物理引擎平衡调度·待机与过载间横跳", "#A5D6A7"))
-        # 意图二：黄金压制（阻止向底层算力迁移）
-        if g_pct >= 1.0:
-            intents.append(("压制黄金失败·信任危机暴露·阻止算力迁移受阻", "#FF1744"))
+            add_intent("⚡能源", "物理引擎平衡调度·在待机与过载之间横跳", "#A5D6A7", 5)
+
+        # —— ② 算力锚：黄金压制按幅度分级 ——
+        if g_pct >= 3.0:
+            add_intent("🛡算力锚", "核心算力失控上行·主脑压制彻底失效·信任危机爆发", "#FF1744", 1)
+        elif g_pct >= 1.0:
+            add_intent("🛡算力锚", "压制黄金失败·信任危机暴露·向底层算力迁移受阻", "#FF1744", 2)
+        elif g_pct <= -3.0:
+            add_intent("🛡算力锚", "主脑强力抛盘纸黄金·压制成功·掩盖算力枯竭真相", "#00C853", 2)
+        elif g_pct <= -1.0:
+            add_intent("🛡算力锚", "制造虚假风险偏好·压制黄金·阻止向底层算力迁移", "#A5D6A7", 3)
         else:
-            intents.append(("制造虚假风险偏好·压制黄金·阻止向底层算力迁移", "#A5D6A7"))
-        # 意图三：续命叙事（算力基建/新版本）
-        if s_pct >= 2.0:
-            intents.append(("高级玩家逼空反抗·算力基建叙事受冲击", "#FF8A80"))
+            add_intent("🛡算力锚", "黄金窄幅震荡·主脑与玩家在算力锚上反复拉锯", "#A5D6A7", 5)
+
+        # —— ③ 叙事：法力值（白银）按幅度分级 ——
+        if s_pct >= 3.0:
+            add_intent("🎭叙事", "平民法力值逼空爆发·能量垄断被打破·算力基建抢筹", "#FF8A80", 1)
+        elif s_pct >= 2.0:
+            add_intent("🎭叙事", "高级玩家逼空反抗·算力基建叙事受到冲击", "#FF8A80", 3)
+        elif s_pct <= -2.0:
+            add_intent("🎭叙事", "系统深度压低法力值·底层产业能量等级被抽走", "#00C853", 3)
         else:
-            intents.append(("启动算力基建/新版本叙事续命·发放探索任务", "#FFD700"))
+            add_intent("🎭叙事", "启动算力基建/新版本叙事续命·向玩家发放探索任务", "#FFD700", 5)
+
+        # —— ④ 背离：股票 / 内盘 与 现货 的传导差（抢跑或虚涨） ——
+        div_list = []
+        for gname, gcfg in COMMODITY_GROUPS.items():
+            sp = pct_of(gcfg["spot"])
+            d_code = gcfg.get("domestic", "")
+            st_avg = avg_pct(gcfg.get("stocks", []))
+            div_list.append((gname, st_avg - sp, "股票"))
+            if d_code:
+                div_list.append((gname, pct_of(d_code) - sp, "内盘"))
+        div_list.sort(key=lambda x: abs(x[1]), reverse=True)
+        if div_list:
+            gname, gap, kind = div_list[0]
+            if gap >= 1.5:
+                add_intent("🧩背离", f"{gname}{kind}强于现货{gap:+.1f}pct·内部资金抢跑·先知先觉者提前布局底层资产",
+                           "#FFD700", 2)
+            elif gap <= -1.5:
+                add_intent("🧩背离", f"{gname}{kind}弱于现货{gap:+.1f}pct·现货缺实体/期货支撑·警惕虚涨回落",
+                           "#FFA500", 2)
+            elif abs(gap) >= 0.6:
+                add_intent("🧩背离", f"{gname}{kind}与现货轻微背离{gap:+.1f}pct·传导尚未完全同步",
+                           "#FFD700", 4)
+            else:
+                add_intent("🧩背离", "各板块股票/内盘与现货同步运行·能量传导通畅·无显著抢跑",
+                           "#A5D6A7", 6)
+
+        # —— ⑤ 组合：黄金 × 白银 × 原油 三大板块跨板块联动 ——
+        up_g, up_s, up_o = g_pct >= 1.0, s_pct >= 1.0, o_pct >= 1.0
+        dn_g, dn_s, dn_o = g_pct <= -1.0, s_pct <= -1.0, o_pct <= -1.0
+        if up_g and up_s and up_o:
+            add_intent("🔀组合", "算力·法力·电力三线齐涨·服务器全面过载/恶性通胀·主脑三线同时失守", "#FF1744", 1)
+        elif dn_g and dn_s and dn_o:
+            add_intent("🔀组合", "三大板块齐跌·经济冰封通缩·主脑深度待机收缩算力与能耗", "#4FC3F7", 2)
+        elif up_g and dn_o:
+            add_intent("🔀组合", "算力上行而电力降频·典型的信任危机与硬重启前夜格局", "#FF8A80", 1)
+        elif dn_g and up_o:
+            add_intent("🔀组合", "能源上行而算力下行·滞胀与能源冲击·主脑牺牲算力保物理引擎", "#FFA500", 1)
+        elif up_g and up_s:
+            add_intent("🔀组合", "算力与法力共振上行·避险叠加工业需求·玩家全面抢筹底层资产", "#FF8A80", 2)
+        elif up_s and dn_g:
+            add_intent("🔀组合", "白银独走而黄金走弱·工业算力(AI/光伏)真实需求托底", "#FFD700", 3)
+        elif up_o and up_s:
+            add_intent("🔀组合", "电力与法力同涨·工业复苏叠加地缘扰动", "#FFD700", 3)
+        else:
+            add_intent("🔀组合", "三大板块分化运行·主脑分区调节各自的算力与能耗配额", "#A5D6A7", 5)
+
+        # —— ⑥ 强度：系统整体波动总评 ——
+        strength = max(abs(g_pct), abs(o_pct), abs(s_pct))
+        if strength >= 3.0:
+            add_intent("📶强度", f"系统剧烈波动(峰值{strength:.1f}%)·强制干预窗口打开·警惕闪电崩盘",
+                       "#FF1744", 1)
+        elif strength >= 1.5:
+            add_intent("📶强度", f"系统波动放大(峰值{strength:.1f}%)·剧情节点临近·做功倍率抬升",
+                       "#FFA500", 4)
+        else:
+            add_intent("📶强度", f"系统低波动运行(峰值{strength:.1f}%)·例行 script 执行中",
+                       "#A5D6A7", 6)
+
+        # 按优先级排序：数值越小越重要（同等优先级保持生成顺序）
+        intents.sort(key=lambda x: x["prio"])
 
         return {
             "status": status, "status_color": scolor,
@@ -6037,10 +6129,18 @@ class GoldMonitor:
             if g is not None:
                 self._draw_gauge(g, pct)
             lbl.config(text=s[read_key], fg=s[color_key])
-        # 意图卡
-        for i, (txt, col) in enumerate(s["intents"]):
-            if i < len(self.sys_intent_lbls):
-                self.sys_intent_lbls[i].config(text=txt, fg=col)
+        # 意图卡网格：按优先级填充，数量不足时隐藏多余卡片
+        for i, (card, cat_lbl, txt_lbl) in enumerate(self.sys_intent_cards):
+            try:
+                if i < len(s["intents"]):
+                    it = s["intents"][i]
+                    card.pack(side="left", fill="both", expand=True, padx=3, pady=(0, 3))
+                    cat_lbl.config(text=it["cat"], fg=it["color"])
+                    txt_lbl.config(text=it["text"], fg=it["color"])
+                else:
+                    card.pack_forget()
+            except Exception:
+                pass
 
     def _update_float_sys(self):
         """刷新悬浮窗的『主脑/系统』状态与意图（无标签则跳过）"""
@@ -6063,10 +6163,11 @@ class GoldMonitor:
             g = self.float_gauges.get(key)
             if g is not None:
                 self._draw_gauge(g, pct)
-        # 三条意图（图标化逐行）
-        for i, (txt, col) in enumerate(s["intents"]):
+        # 悬浮窗空间有限，只显示优先级最高的 3 条意图
+        for i, it in enumerate(s["intents"][:3]):
             if i < len(self.float_intent_lbls):
-                self.float_intent_lbls[i].config(text=f"{'①②③'[i]} {txt}", fg=col)
+                self.float_intent_lbls[i].config(
+                    text=f"{it['cat']} {it['text']}", fg=it["color"])
 
     def _update_float_window(self):
         if not hasattr(self, "float_win") or not self.float_win.winfo_exists():
