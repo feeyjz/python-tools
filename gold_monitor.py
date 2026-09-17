@@ -4493,6 +4493,26 @@ class GoldMonitor:
                             lambda e, idx=i: self._col_resize_start(e, idx))
                 handle.bind("<B1-Motion>", self._col_resize_drag)
                 handle.bind("<ButtonRelease-1>", self._col_resize_end)
+        # ---- 主体内容放进纵向滚动区（表头保持固定在顶部，不随滚动）----
+        # 面板/数据表/联动/持仓/交易记录堆叠后高度可能远超窗口，必须可滚动
+        real_main_frame = self.main_frame
+        wrap = tk.Frame(real_main_frame, bg=self.BG)
+        wrap.pack(side="top", fill="both", expand=True)
+        canvas = tk.Canvas(wrap, bg=self.BG, highlightthickness=0, bd=0)
+        vsb = tk.Scrollbar(wrap, orient="vertical", command=canvas.yview)
+        canvas.configure(yscrollcommand=vsb.set)
+        vsb.pack(side="right", fill="y")
+        canvas.pack(side="left", fill="both", expand=True)
+        body = tk.Frame(canvas, bg=self.BG)
+        self.scroll_canvas = canvas
+        self.scroll_body = body
+        win_id = canvas.create_window((0, 0), window=body, anchor="nw")
+        body.bind("<Configure>",
+                  lambda e: canvas.configure(scrollregion=canvas.bbox("all")))
+        canvas.bind("<Configure>",
+                    lambda e: canvas.itemconfig(win_id, width=e.width))
+        # 后续所有内容都创建到滚动区内
+        self.main_frame = body
         tk.Frame(self.main_frame, bg=self.BORDER, height=1).pack(fill="x")
         # 主脑/系统 实时状态面板（世界假说 × 缠论）
         sys_frame = tk.Frame(self.main_frame, bg="#10243a", relief="solid", bd=1,
@@ -4676,9 +4696,47 @@ class GoldMonitor:
         self.trade_log_canvas.create_window((0, 0), window=self.trade_log_frame, anchor="nw")
         self.trade_log_frame.bind("<Configure>",
             lambda e: self.trade_log_canvas.configure(scrollregion=self.trade_log_frame.bbox("all")))
-        # 鼠标滚轮支持
-        self.trade_log_canvas.bind_all("<MouseWheel>",
-            lambda e: self.trade_log_canvas.yview_scroll(int(-1*(e.delta/120)), "units"))
+        # 鼠标滚轮：统一由全局分发器按指针位置路由（见 _on_global_wheel）
+        self._install_global_wheel()
+        # 还原真正的 main_frame 引用
+        self.main_frame = real_main_frame
+
+    def _install_global_wheel(self):
+        """安装全局滚轮分发：同一时刻只允许一个 bind_all，避免互相劫持。"""
+        try:
+            self.root.unbind_all("<MouseWheel>")
+        except Exception:
+            pass
+        self.root.bind_all("<MouseWheel>", self._on_global_wheel)
+
+    def _on_global_wheel(self, event):
+        """按指针所在容器路由滚轮：优先内层容器（交易记录），否则滚动主区域。"""
+        tl = getattr(self, "trade_log_canvas", None)
+        main = getattr(self, "scroll_canvas", None)
+        target = None
+        try:
+            p = event.widget
+            guard = 0
+            while p is not None and guard < 64:
+                guard += 1
+                sp = str(p)
+                if tl is not None and sp == str(tl):
+                    target = tl
+                    break
+                if main is not None and sp == str(main):
+                    target = main
+                    break
+                p = getattr(p, "master", None)
+        except Exception:
+            target = main
+        if target is None:
+            target = main
+        if target is None:
+            return
+        try:
+            target.yview_scroll(int(-1 * (event.delta / 120)), "units")
+        except Exception:
+            pass
 
     def _build_group_display(self):
         """构建多品种联立分析显示"""
@@ -6782,7 +6840,8 @@ class GoldMonitor:
     def _close_tooltip(self):
         if self.tooltip_window:
             try:
-                self.tooltip_window.unbind_all("<MouseWheel>")
+                # 注意：不可在此 unbind_all("<MouseWheel>")，会把主窗口的全局滚轮
+                # 分发器一并清除。全局分发器已按指针位置路由，tooltip 不匹配则忽略。
                 self.tooltip_window.destroy()
             except Exception:
                 pass
