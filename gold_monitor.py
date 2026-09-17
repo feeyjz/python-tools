@@ -3985,20 +3985,28 @@ def derive_trading_points(strokes, segments, pivots, std_pivots, div, div_60m, p
     # ---- 一买 / 一卖（背驰末端）----
     if div and div.get("type") != "none":
         t = div["type"]; kind = div.get("kind", "consolidation"); ratio = div.get("ratio", 1.0)
+        # 背驰末端即末笔末端，以此作为图上买卖点的锚点
+        if strokes:
+            tail_idx = strokes[-1]["end"]["index"]
+            tail_val = strokes[-1]["end"]["value"]
+        else:
+            tail_idx, tail_val = None, None
         if t == "bottom":
             strong = (kind == "trend")
             points.append({
                 "name": "★一买" if strong else "★一买弱", "type": "buy", "price": price,
                 "strength": 1.0 if strong else 0.6,
                 "desc": f"底背驰·{kind}，MACD面积比{ratio:.2f}，下跌动能衰竭",
-                "color": "#FF4444" if strong else "#FF8888"})
+                "color": "#FF4444" if strong else "#FF8888",
+                "idx": tail_idx, "value": tail_val})
         else:
             strong = (kind == "trend")
             points.append({
                 "name": "▲一卖" if strong else "▲一卖弱", "type": "sell", "price": price,
                 "strength": 1.0 if strong else 0.6,
                 "desc": f"顶背驰·{kind}，MACD面积比{ratio:.2f}，上涨动能衰竭",
-                "color": "#4CAF50" if strong else "#88AA88"})
+                "color": "#4CAF50" if strong else "#88AA88",
+                "idx": tail_idx, "value": tail_val})
 
     # ---- 二买 / 二卖（回抽不破前低 / 前高）----
     if len(strokes) >= 4:
@@ -4011,14 +4019,16 @@ def derive_trading_points(strokes, segments, pivots, std_pivots, div, div_60m, p
                 if prev_down and cur["low"] > prev_down["low"]:
                     points.append({"name": "★二买", "type": "buy", "price": price, "strength": 0.8,
                                    "desc": f"回抽低点{cur['low']:.2f}未破前低{prev_down['low']:.2f}",
-                                   "color": "#FF6B35"})
+                                   "color": "#FF6B35",
+                                   "idx": cur["end"]["index"], "value": cur["end"]["value"]})
             else:
                 prev_up = next((s for s in reversed(strokes)
                                 if s["direction"] == "up" and s["end"]["index"] < cur["start"]["index"]), None)
                 if prev_up and cur["high"] < prev_up["high"]:
                     points.append({"name": "▲二卖", "type": "sell", "price": price, "strength": 0.8,
                                    "desc": f"回抽高点{cur['high']:.2f}未破前高{prev_up['high']:.2f}",
-                                   "color": "#2196F3"})
+                                   "color": "#2196F3",
+                                   "idx": cur["end"]["index"], "value": cur["end"]["value"]})
 
     # ---- 三买 / 三卖（突破中枢后回抽不进中枢）----
     if last_pivot and len(strokes) >= 3:
@@ -4031,14 +4041,16 @@ def derive_trading_points(strokes, segments, pivots, std_pivots, div, div_60m, p
             if pb and pb["low"] >= zg:
                 points.append({"name": "◆三买", "type": "buy", "price": price, "strength": 0.85,
                                "desc": f"突破中枢上沿{zg:.2f}后回抽{pb['low']:.2f}未进中枢",
-                               "color": "#FFA500"})
+                               "color": "#FFA500",
+                               "idx": pb["end"]["index"], "value": pb["end"]["value"]})
         if leave_down:
             pb = next((s for s in reversed(strokes)
                        if s["direction"] == "up" and s["end"]["index"] > leave_down["end"]["index"]), None)
             if pb and pb["high"] <= zd:
                 points.append({"name": "◆三卖", "type": "sell", "price": price, "strength": 0.85,
                                "desc": f"跌破中枢下沿{zd:.2f}后回抽{pb['high']:.2f}未进中枢",
-                               "color": "#9C27B0"})
+                               "color": "#9C27B0",
+                               "idx": pb["end"]["index"], "value": pb["end"]["value"]})
 
     # ---- 区间套：日线 + 次级别背驰共振 ----
     if div_60m and div and div.get("type") != "none":
@@ -4641,7 +4653,7 @@ class GoldMonitor:
                             ("一卖","#4CAF50"),("二卖","#2196F3"),("三卖","#9C27B0")]:
             tk.Label(lb, text=f"●{text}", bg=self.BG, fg=color,
                      font=("Microsoft YaHei", 7)).pack(side="left", padx=3)
-        tk.Label(lb, text="｜ 单击行=详情  双击行=缠论K线图", bg=self.BG, fg="#888888",
+        tk.Label(lb, text="｜ 左键单击行=详情Tips   右键单击行=缠论K线图", bg=self.BG, fg="#888888",
                  font=("Microsoft YaHei", 7)).pack(side="right", padx=6)
         
         # ---- 自动交易记录面板 ----
@@ -5315,7 +5327,7 @@ class GoldMonitor:
         row = tk.Frame(self.data_frame, bg=bg, cursor="hand2")
         row.pack(fill="x", pady=0)
         row.bind("<Button-1>", lambda e, c=code: self._show_tooltip(c))
-        row.bind("<Double-Button-1>", lambda e, c=code: self._show_chart(c))
+        row.bind("<Button-3>", lambda e, c=code: self._show_chart(c))
         nl = tk.Label(row, text=name, bg=bg, fg=self.FG, font=("Microsoft YaHei", 9, "bold"),
                       anchor="w", width=10); nl.pack(side="left", padx=(8,2), pady=6)
         pl = tk.Label(row, text="--", bg=bg, fg=self.FG, font=("Consolas", 10, "bold"),
@@ -5364,7 +5376,7 @@ class GoldMonitor:
         pnl_label.pack(side="left", padx=1, pady=6)
         for w in [nl, pl, pcl, sl, mm_lbl, pvl, spl, rsl, prl_h, prl_d]:
             w.bind("<Button-1>", lambda e, c=code: self._show_tooltip(c))
-            w.bind("<Double-Button-1>", lambda e, c=code: self._show_chart(c))
+            w.bind("<Button-3>", lambda e, c=code: self._show_chart(c))
         self.rows[code] = {"row": row, "name": nl, "price": pl, "pct": pcl,
                            "signal": sl, "mm_intention": mm_lbl, "pivot": pvl, "support": spl, "resistance": rsl,
                            "pred_h": prl_h, "pred_d": prl_d,
@@ -5373,7 +5385,8 @@ class GoldMonitor:
 
     # ---- K线图窗口（缠论结构可视化）----
     def _show_chart(self, code):
-        """双击行打开：绘制日线K线 + 笔 + 线段 + 中枢 + 买卖点 + MACD"""
+        """右键行打开：日线K线 + 笔 + 线段 + 中枢 + 分型 + 背驰 + 买卖点 + MACD，
+        右侧附缠论要点解读面板。"""
         try:
             import matplotlib
             matplotlib.use("TkAgg")
@@ -5387,12 +5400,20 @@ class GoldMonitor:
                     matplotlib.rcParams["axes.unicode_minus"] = False
                     break
             import matplotlib.pyplot as plt
+            from matplotlib.patches import Rectangle, Patch
+            from matplotlib.lines import Line2D
             from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
-        except Exception:
+            try:
+                from matplotlib.backends.backend_tkagg import NavigationToolbar2Tk
+            except Exception:
+                NavigationToolbar2Tk = None
+        except Exception as e:
+            print(f"[K线图] 依赖不可用: {e}")
             return
         ana = self.analysis.get(code)
         cfg = SYMBOLS.get(code)
         if not ana or not ana.get("klines_daily"):
+            print("[K线图] 该品种K线尚未加载完成")
             return
         klines = ana["klines_daily"]
         daily = ana.get("timeframes", {}).get("daily", ana)
@@ -5406,101 +5427,431 @@ class GoldMonitor:
         closes_m = [k.get("close", k["high"]) for k in merged]
         N = len(merged)
 
-        win = tk.Toplevel(self.root)
-        win.title(f"{cfg['name'] if cfg else code} · 缠论K线图")
-        win.attributes("-topmost", True)
-        win.configure(bg="#0d1117")
-        fig = plt.Figure(figsize=(12, 7), dpi=100)
-        fig.patch.set_facecolor("#0d1117")
+        # 同一品种不重复开窗
+        if not hasattr(self, "_chart_windows"):
+            self._chart_windows = {}
+        prev_win = self._chart_windows.get(code)
+        if prev_win is not None:
+            try:
+                prev_win.destroy()
+            except Exception:
+                pass
 
-        # 价格子图
-        ax = fig.add_subplot(2, 1, 1)
+        sw = max(1200, self.root.winfo_screenwidth())
+        sh = max(700, self.root.winfo_screenheight())
+        panel_w = 340
+        win_w = max(900, min(sw - 40, 1500))
+        win_h = max(620, min(sh - 60, 950))
+        win = tk.Toplevel(self.root)
+        win.title(f"{cfg['name'] if cfg else code} · 缠论K线图（日线）")
+        win.configure(bg="#0d1117")
+        win.geometry(f"{win_w}x{win_h}+{max(0, (sw - win_w) // 2)}+{max(0, (sh - win_h) // 2 - 20)}")
+        self._chart_windows[code] = win
+
+        left = tk.Frame(win, bg="#0d1117")
+        left.pack(side="left", fill="both", expand=True)
+        right = tk.Frame(win, bg="#0d1117", width=panel_w)
+        right.pack(side="right", fill="y")
+        right.pack_propagate(False)
+
+        fig = plt.Figure(figsize=(max(6.0, (win_w - panel_w - 30) / 100.0),
+                                  max(4.0, (win_h - 80) / 100.0)), dpi=100)
+        fig.patch.set_facecolor("#0d1117")
+        try:
+            _gs = fig.add_gridspec(2, 1, height_ratios=[3.2, 1], hspace=0.06)
+            ax = fig.add_subplot(_gs[0])
+            ax2 = fig.add_subplot(_gs[1], sharex=ax)
+        except Exception:
+            ax = fig.add_subplot(2, 1, 1)
+            ax2 = fig.add_subplot(2, 1, 2, sharex=ax)
+
+        price_hi = max(k["high"] for k in merged)
+        price_lo = min(k["low"] for k in merged)
+        price_span = max(price_hi - price_lo, 1e-9)
+        cur_px = (self.rt_data.get(code, {}) or {}).get("price") or merged[-1].get("close", 0)
+
+        # 背驰对比所需的「两段同向笔」（与 check_divergence 取法一致）
+        div = daily.get("divergence_info") or {}
+        dv = div.get("type", "none")
+        div_pair = []
+        if dv != "none" and strokes:
+            _last = strokes[-1]
+            for s in reversed(strokes[:-1]):
+                if s["direction"] == _last["direction"]:
+                    div_pair = [s, _last]
+                    break
+
+        # ================= 价格子图 =================
         ax.set_facecolor("#0d1117")
-        opens = [k.get("open", k["close"]) for k in merged]
+        opens = [k.get("open", k.get("close", k["high"])) for k in merged]
+        min_body = price_span * 0.0015
         for i, k in enumerate(merged):
-            o, c, h, l = opens[i], closes_m[i], k["high"], k["low"]
-            col = "#FF4D4D" if c >= o else "#2ECC71"
-            ax.plot([i, i], [l, h], color=col, linewidth=0.7, alpha=0.85)
-            ax.plot([i - 0.32, i + 0.32], [o, o], color=col, linewidth=1.4)
-            ax.plot([i - 0.32, i + 0.32], [c, c], color=col, linewidth=1.4)
+            o_, c_ = opens[i], closes_m[i]
+            h_, l_ = k["high"], k["low"]
+            col = "#FF4D4D" if c_ >= o_ else "#2ECC71"
+            # 画实体（有厚度），避免十字星 / 极窄K线看不清
+            ax.add_patch(Rectangle((i - 0.34, min(o_, c_)), 0.68,
+                                   max(abs(c_ - o_), min_body),
+                                   facecolor=col, edgecolor=col, linewidth=0.5,
+                                   alpha=0.95, zorder=3))
+            ax.plot([i, i], [l_, h_], color=col, linewidth=0.8, alpha=0.9, zorder=3)
+
+        # 均线辅助（MA5 / MA10 / MA20）
+        def _ma(vals, n):
+            if len(vals) < n:
+                return None
+            out, s = [], 0.0
+            for i, v in enumerate(vals):
+                s += v
+                if i >= n:
+                    s -= vals[i - n]
+                out.append(s / n if i >= n - 1 else float("nan"))
+            return out
+        ma_legend = []
+        for _n, _mc in ((5, "#FFD700"), (10, "#4FC3F7"), (20, "#CE93D8")):
+            mv = _ma(closes_m, _n)
+            if mv:
+                ax.plot(range(len(mv)), mv, color=_mc, linewidth=0.8, alpha=0.55, zorder=2)
+                ma_legend.append((_n, _mc))
+
+        # 分型（顶 / 底）
+        try:
+            frs = find_fractals(merged)
+        except Exception:
+            frs = []
+        if frs:
+            tx = [f["index"] for f in frs if f["type"] == "top"]
+            ty = [f["value"] * (1 + 0.0015) for f in frs if f["type"] == "top"]
+            bx = [f["index"] for f in frs if f["type"] == "bottom"]
+            by = [f["value"] * (1 - 0.0015) for f in frs if f["type"] == "bottom"]
+            if tx:
+                ax.scatter(tx, ty, marker="v", s=13, color="#B0BEC5", alpha=0.7, zorder=6)
+            if bx:
+                ax.scatter(bx, by, marker="^", s=13, color="#B0BEC5", alpha=0.7, zorder=6)
+
+        # 背驰对比区：两段同向笔竖带 + 极值连线 + 力度比标注
+        if div_pair:
+            dv_col = "#00C853" if dv == "top" else "#FF1744"
+            for _s, _a in zip(div_pair, (0.08, 0.14)):
+                ax.axvspan(_s["start"]["index"], _s["end"]["index"],
+                           color=dv_col, alpha=_a, zorder=0)
+            if dv == "top":
+                y_pair = [div_pair[0]["high"], div_pair[1]["high"]]
+            else:
+                y_pair = [div_pair[0]["low"], div_pair[1]["low"]]
+            x_pair = [div_pair[0]["end"]["index"], div_pair[1]["end"]["index"]]
+            ax.plot(x_pair, y_pair, color=dv_col, linewidth=1.0,
+                    linestyle="-.", alpha=0.85, zorder=7)
+            _kc = "趋势背驰" if div.get("kind") == "trend" else "盘整背驰"
+            ax.annotate(f"{'顶背驰·' if dv == 'top' else '底背驰·'}{_kc} 力度比{div.get('ratio', 1):.2f}",
+                        xy=(x_pair[1], y_pair[1]),
+                        xytext=(0, 26 if dv == "top" else -26), textcoords="offset points",
+                        ha="center", fontsize=8, fontweight="bold", color=dv_col,
+                        bbox=dict(boxstyle="round,pad=0.25", fc="#0d1117", ec=dv_col, alpha=0.85),
+                        arrowprops=dict(arrowstyle="->", color=dv_col, lw=1.0), zorder=10)
 
         # 笔（金色实线）
         for s in strokes:
-            si, ei = s["start"]["index"], s["end"]["index"]
-            ax.plot([si, ei], [s["start"]["value"], s["end"]["value"]],
+            ax.plot([s["start"]["index"], s["end"]["index"]],
+                    [s["start"]["value"], s["end"]["value"]],
                     color="#FFD700", linewidth=1.5, alpha=0.95, zorder=5)
-        # 线段（蓝色虚线，更粗）
+
+        # 线段（青色粗虚线）：首笔起点 → 末笔终点，而非 high→low 斜线
         for seg in segments:
-            si, ei = seg["start_idx"], seg["end_idx"]
-            if ei > si:
-                ax.plot([si, ei], [seg["high"], seg["low"]], color="#4FC3F7",
-                        linewidth=2.2, linestyle="--", alpha=0.85, zorder=4)
-        # 中枢（紫色半透明带）—— 使用合并K线坐标 x0/x1 水平定位
-        def _pivot_xrange(p):
-            x0 = p.get("x0"); x1 = p.get("x1")
-            if x0 is None or x1 is None:
-                # 回退：由笔/线段索引映射到合并K线坐标
-                src = segments if p.get("from_segments") else strokes
-                si, ei = p.get("start_idx"), p.get("end_idx")
-                if src and si is not None and ei is not None and 0 <= si < len(src) and 0 <= ei < len(src):
-                    a, b = src[si], src[ei]
-                    x0 = a.get("start_idx", a.get("start", {}).get("index"))
-                    x1 = b.get("end_idx", b.get("end", {}).get("index"))
-            return x0, x1
-        for p in used_pivots:
-            x0, x1 = _pivot_xrange(p)
-            if x0 is None or x1 is None or N <= 1:
+            _ss = seg.get("strokes") or []
+            if not _ss:
                 continue
-            ax.axhspan(p["zd"], p["zg"], xmin=x0 / (N - 1), xmax=x1 / (N - 1),
-                       color="#AB47BC", alpha=0.22, zorder=1)
-            # 中枢上下沿虚线，便于看清震荡区间
-            ax.plot([x0, x1], [p["zg"], p["zg"]], color="#AB47BC", linewidth=0.6, alpha=0.5, zorder=1)
-            ax.plot([x0, x1], [p["zd"], p["zd"]], color="#AB47BC", linewidth=0.6, alpha=0.5, zorder=1)
+            x0, x1 = _ss[0]["start"]["index"], _ss[-1]["end"]["index"]
+            y0, y1 = _ss[0]["start"]["value"], _ss[-1]["end"]["value"]
+            if x1 <= x0:
+                continue
+            ax.plot([x0, x1], [y0, y1], color="#4FC3F7", linewidth=2.4,
+                    linestyle="--", alpha=0.9, zorder=4)
 
-        # 买卖点（箭头 + 名称标注；同方向末笔定位，纵向错开避免重叠）
-        last_down = [s for s in strokes if s["direction"] == "down"]
-        last_up = [s for s in strokes if s["direction"] == "up"]
-        buy_off = sell_off = 0
+        # 中枢（紫色带 + ZG/ZD 实线 + GG/DD 点线 + 文本标注）
+        for pi, p in enumerate(used_pivots, start=1):
+            x0, x1 = p.get("x0"), p.get("x1")
+            if x0 is None or x1 is None:
+                _src = segments if p.get("from_segments") else strokes
+                si_, ei_ = p.get("start_idx"), p.get("end_idx")
+                if _src and si_ is not None and ei_ is not None \
+                        and 0 <= si_ < len(_src) and 0 <= ei_ < len(_src):
+                    a_, b_ = _src[si_], _src[ei_]
+                    x0 = a_.get("start_idx", a_.get("start", {}).get("index"))
+                    x1 = b_.get("end_idx", b_.get("end", {}).get("index"))
+            if x0 is None or x1 is None:
+                continue
+            if x1 < x0:
+                x0, x1 = x1, x0
+            if x1 == x0:
+                x1 = min(x0 + 1, N - 1)
+            # 用数据坐标填充，避免 set_xlim 之后 axhspan 的轴比例错位
+            ax.fill_between([x0, x1], [p["zd"]] * 2, [p["zg"]] * 2,
+                            color="#AB47BC", alpha=0.18, zorder=1)
+            ax.plot([x0, x1], [p["zg"]] * 2, color="#AB47BC", linewidth=0.9, alpha=0.75, zorder=1)
+            ax.plot([x0, x1], [p["zd"]] * 2, color="#AB47BC", linewidth=0.9, alpha=0.75, zorder=1)
+            # 引力边界 GG / DD
+            ax.plot([x0, x1], [p["gg"]] * 2, color="#CE93D8", linewidth=0.7,
+                    linestyle=":", alpha=0.6, zorder=1)
+            ax.plot([x0, x1], [p["dd"]] * 2, color="#CE93D8", linewidth=0.7,
+                    linestyle=":", alpha=0.6, zorder=1)
+            ax.text((x0 + x1) / 2.0, p["zg"],
+                    f" 中枢{pi} [{p['zd']:.2f}~{p['zg']:.2f}] ",
+                    color="#E1BEE7", fontsize=7, ha="center", va="bottom",
+                    alpha=0.95, zorder=8,
+                    bbox=dict(boxstyle="round,pad=0.15", fc="#2a1035", ec="none", alpha=0.6))
+
+        # 买卖点：按各自触发笔的末端定位（同索引纵向错开，虚线连回锚点）
+        slot_used = {}
         for tp in tps:
-            if tp["type"] == "buy" and last_down:
-                s = last_down[-1]; x = s["end"]["index"]; y = s["end"]["value"]
-                yoff = y * 0.022 * buy_off; buy_off += 1
-                ax.scatter([x], [y - yoff], marker="^", s=180, color=tp.get("color", "#FF4D4D"),
-                           zorder=7, edgecolors="white", linewidths=0.7)
-                ax.annotate(tp["name"], (x, y - yoff), color=tp.get("color", "#FF4D4D"),
-                            fontsize=8, fontweight="bold", ha="center", va="top")
-            elif tp["type"] == "sell" and last_up:
-                s = last_up[-1]; x = s["end"]["index"]; y = s["end"]["value"]
-                yoff = y * 0.022 * sell_off; sell_off += 1
-                ax.scatter([x], [y + yoff], marker="v", s=180, color=tp.get("color", "#2ECC71"),
-                           zorder=7, edgecolors="white", linewidths=0.7)
-                ax.annotate(tp["name"], (x, y + yoff), color=tp.get("color", "#2ECC71"),
-                            fontsize=8, fontweight="bold", ha="center", va="bottom")
+            _x = tp.get("idx")
+            _y = tp.get("value")
+            if _x is None or _y is None:
+                continue
+            is_buy = tp["type"] == "buy"
+            tcol = tp.get("color", "#FF4D4D")
+            seq = slot_used.get(_x, 0)
+            slot_used[_x] = seq + 1
+            off = price_span * (0.035 + 0.05 * seq)
+            yy = _y - off if is_buy else _y + off
+            ax.plot([_x, _x], [_y, yy], color=tcol, linewidth=0.8, alpha=0.6, zorder=7)
+            ax.scatter([_x], [yy], marker="^" if is_buy else "v", s=190, color=tcol,
+                       zorder=9, edgecolors="white", linewidths=0.8)
+            ax.annotate(tp["name"], (_x, yy), color=tcol, fontsize=8.5, fontweight="bold",
+                        ha="center", va="top" if is_buy else "bottom", zorder=9,
+                        bbox=dict(boxstyle="round,pad=0.15", fc="#0d1117", ec=tcol, alpha=0.75))
 
-        ax.set_title(f"{cfg['name'] if cfg else code} · 日线缠论结构（金=笔 蓝虚=线段 紫=中枢 红▲买 绿▼卖）",
-                     color="#e0e0e0", fontsize=11, fontweight="bold")
-        ax.tick_params(colors="#888888", labelsize=7)
-        for spine in ax.spines.values():
-            spine.set_color("#333333")
+        # 支撑 / 阻力 / 现价水平线（右缘标签过近时自动错开，避免叠字）
+        sup = daily.get("nearest_support")
+        res = daily.get("nearest_resistance")
+        _placed = []
 
-        # MACD 子图
-        ax2 = fig.add_subplot(2, 1, 2)
+        def _edge_y(y, down):
+            yy = y
+            for _py in _placed:
+                if abs(yy - _py) < price_span * 0.03:
+                    yy = _py - price_span * 0.03 if down else _py + price_span * 0.03
+            _placed.append(yy)
+            return yy
+
+        for _v, _c, _tag in ((res, "#FF8A80", "阻力"), (sup, "#A5D6A7", "支撑")):
+            if _v:
+                ax.axhline(_v, color=_c, linewidth=0.9, linestyle="--", alpha=0.7, zorder=2)
+                _va = "bottom" if _tag == "阻力" else "top"
+                ax.text(N - 0.5, _edge_y(_v, _va == "top"), f" {_tag} {_v:.2f} ",
+                        color=_c, fontsize=7, ha="right", va=_va, alpha=0.95, zorder=8)
+        if cur_px:
+            ax.axhline(cur_px, color="#FFFFFF", linewidth=0.8, linestyle=":", alpha=0.55, zorder=2)
+            ax.text(N - 0.5, _edge_y(cur_px, True), f" 现价 {cur_px:.2f} ",
+                    color="#E6EDF3", fontsize=7, ha="right", va="center",
+                    alpha=0.95, zorder=8)
+
+        # 标题 / 图例 / 坐标轴
+        sig = ana.get("signal", "●观望")
+        sig_c = ana.get("signal_color", "#888888")
+        tmap = {"up": "↑上涨趋势", "down": "↓下跌趋势",
+                "consolidation": "～中枢震荡", "unknown": "方向未明"}
+        trend_txt = tmap.get(daily.get("trend", "unknown"), "方向未明")
+        ax.set_title(f"{cfg['name'] if cfg else code} · 日线缠论结构    {sig}   {trend_txt}",
+                     color=sig_c, fontsize=12, fontweight="bold", pad=22)
+        ax.text(0.0, 1.012,
+                "红涨绿跌 · 金=笔 青虚=线段 紫=中枢(ZG/ZD实线 · GG/DD点线) 灰角=分型 ▲买 ▼卖",
+                transform=ax.transAxes, color="#8b949e", fontsize=7.5)
+        handles = [
+            Line2D([], [], color="#FFD700", lw=1.5, label=f"笔 {len(strokes)}"),
+            Line2D([], [], color="#4FC3F7", lw=2.2, ls="--", label=f"线段 {len(segments)}"),
+            Patch(facecolor="#AB47BC", alpha=0.45, label=f"中枢 {len(used_pivots)}"),
+            Line2D([], [], marker="v", ls="", color="#B0BEC5", ms=4, label=f"分型 {len(frs)}"),
+        ]
+        for _n, _mc in ma_legend:
+            handles.append(Line2D([], [], color=_mc, lw=1.0, alpha=0.7, label=f"MA{_n}"))
+        leg = ax.legend(handles=handles, loc="upper left", fontsize=7.5, ncol=7,
+                        framealpha=0.3, facecolor="#0d1117", edgecolor="#30363d")
+        for _t in leg.get_texts():
+            _t.set_color("#c9d1d9")
+
+        # 日期横轴（默认展示最近 120 根合并K线，可用底部工具栏缩放 / 平移）
+        day_lbl = [str(k.get("day", ""))[:10] for k in merged]
+        step = max(1, N // 12)
+        tick_idx = list(range(0, N, step))
+        if tick_idx and tick_idx[-1] != N - 1:
+            tick_idx.append(N - 1)
+        ax.set_xticks(tick_idx)
+        ax2.set_xticklabels([day_lbl[i][5:] if len(day_lbl[i]) >= 10 else str(i)
+                             for i in tick_idx], fontsize=7)
+        ax.tick_params(colors="#888888", labelsize=7, labelbottom=False)
+        ax2.tick_params(colors="#888888", labelsize=7)
+        ax.set_ylabel("价格", color="#8b949e", fontsize=8)
+        ax.grid(True, color="#1b2430", linewidth=0.5, alpha=0.8)
+        for _sp in ax.spines.values():
+            _sp.set_color("#30363d")
+        view_n = 120
+        start_x = max(0, N - view_n)
+        ax.set_xlim(start_x - 0.5, N - 0.5 + 1.5)
+
+        # ================= MACD 子图 =================
         ax2.set_facecolor("#0d1117")
         dif, dea, hist = calc_macd(closes_m)
         if hist:
             ax2.bar(range(len(hist)), hist, width=0.8,
-                    color=["#FF4D4D" if h >= 0 else "#2ECC71" for h in hist], alpha=0.85)
-            ax2.plot(range(len(dif)), dif, color="#FFD700", linewidth=0.8)
-            ax2.plot(range(len(dea)), dea, color="#4FC3F7", linewidth=0.8)
-        ax2.set_title("MACD (12,26,9) — 背驰检测依据", color="#e0e0e0", fontsize=9)
-        ax2.tick_params(colors="#888888", labelsize=7)
-        for spine in ax2.spines.values():
-            spine.set_color("#333333")
+                    color=["#FF4D4D" if _h >= 0 else "#2ECC71" for _h in hist], alpha=0.85)
+            ax2.plot(range(len(dif)), dif, color="#FFD700", linewidth=0.9, label="DIF")
+            ax2.plot(range(len(dea)), dea, color="#4FC3F7", linewidth=0.9, label="DEA")
+            if div_pair:
+                dv_col = "#00C853" if dv == "top" else "#FF1744"
+                _hmax = max(max(hist), max(abs(min(hist)), 1e-9)) * 0.98
+                for i, _s in enumerate(div_pair):
+                    ax2.axvspan(_s["start"]["index"], _s["end"]["index"],
+                                color=dv_col, alpha=0.10 if i == 0 else 0.16, zorder=0)
+                    _area = div.get("prev_area", 0) if i == 0 else div.get("last_area", 0)
+                    ax2.text((_s["start"]["index"] + _s["end"]["index"]) / 2.0, _hmax,
+                             f"面积 {_area:.2f}", color=dv_col, fontsize=7,
+                             ha="center", va="top", alpha=0.95)
+            _leg2 = ax2.legend(loc="upper left", fontsize=7, ncol=2, framealpha=0.3,
+                               facecolor="#0d1117", edgecolor="#30363d")
+            for _t in _leg2.get_texts():
+                _t.set_color("#c9d1d9")
+        _t2 = "MACD (12,26,9) — 背驰检测依据"
+        if dv != "none":
+            _t2 += (f" | {'顶' if dv == 'top' else '底'}背驰"
+                    f" 力度比 {div.get('ratio', 1):.2f}（<0.8 判定力度衰竭）")
+        ax2.set_title(_t2, color="#e0e0e0", fontsize=9)
+        ax2.grid(True, color="#1b2430", linewidth=0.5, alpha=0.8)
+        for _sp in ax2.spines.values():
+            _sp.set_color("#30363d")
 
-        fig.tight_layout()
-        canvas = FigureCanvasTkAgg(fig, master=win)
+        # 固定布局（tight_layout 对 gridspec+共享轴会告警，这里手动留白）
+        fig.subplots_adjust(left=0.045, right=0.985, top=0.925,
+                            bottom=0.06, hspace=0.07)
+        canvas = FigureCanvasTkAgg(fig, master=left)
         canvas.draw()
         canvas.get_tk_widget().pack(fill="both", expand=True)
+        if NavigationToolbar2Tk is not None:
+            try:
+                _tb = NavigationToolbar2Tk(canvas, left)
+                _tb.update()
+                try:
+                    _tb.config(bg="#0d1117")
+                except Exception:
+                    pass
+            except Exception:
+                pass
+
+        # ================= 右侧缠论解读面板 =================
+        tk.Label(right, text="🧠 缠论要点解读", bg="#10243a", fg="#FFD700",
+                 font=("Microsoft YaHei", 10, "bold"), anchor="w").pack(fill="x", padx=6, pady=(6, 2))
+        wrap = tk.Frame(right, bg="#0d1117")
+        wrap.pack(fill="both", expand=True, padx=6, pady=4)
+        sb = tk.Scrollbar(wrap)
+        sb.pack(side="right", fill="y")
+        txt = tk.Text(wrap, bg="#0d1117", fg="#c9d1d9", insertbackground="#c9d1d9",
+                      font=("Microsoft YaHei", 8), wrap="word", bd=0, relief="flat",
+                      yscrollcommand=sb.set, spacing1=2, spacing3=2)
+        txt.pack(side="left", fill="both", expand=True)
+        sb.config(command=txt.yview)
+        for _tag, _tc in (("h", "#FFD700"), ("sig", sig_c), ("buy", "#FF6B6B"),
+                          ("sell", "#4CAF50"), ("pivot", "#CE93D8"), ("dim", "#6e7681"),
+                          ("div", "#FFA500")):
+            txt.tag_config(_tag, foreground=_tc)
+
+        def put(line, tag=None):
+            if tag:
+                txt.insert("end", line + "\n", tag)
+            else:
+                txt.insert("end", line + "\n")
+
+        put(f"【当前信号】{sig}", "sig")
+        for _l in str(ana.get("signal_desc", "")).split("\n"):
+            put("  " + _l)
+        put("")
+        put(f"【趋势】{trend_txt}   参与级别 {ana.get('timeframe_count', 1)} 个", "h")
+        put(f"合并K线 {N} 根 | 笔 {len(strokes)} | 线段 {len(segments)} | 中枢 {len(used_pivots)}", "dim")
+        put("")
+        if used_pivots:
+            put("【中枢】ZG/ZD=震荡区间，GG/DD=引力极限", "pivot")
+            for i, p in enumerate(used_pivots[-4:], start=max(1, len(used_pivots) - 3)):
+                _knd = "线段中枢" if p.get("from_segments") else "笔中枢"
+                put(f"  #{i} {_knd}  ZG {p['zg']:.2f} / ZD {p['zd']:.2f}")
+                put(f"      GG {p['gg']:.2f} / DD {p['dd']:.2f}  方向 {p.get('direction', '')}", "dim")
+            lp = used_pivots[-1]
+            if cur_px:
+                if cur_px > lp["zg"]:
+                    _pos = "现价在最近中枢上方 → 多头占优，回抽不破 ZG 即三买"
+                elif cur_px < lp["zd"]:
+                    _pos = "现价在最近中枢下方 → 空头占优，反抽不破 ZD 即三卖"
+                else:
+                    _pos = "现价在最近中枢内部 → 中枢震荡，等待第三买卖点"
+                put(f"  {_pos}")
+        put("")
+        put("【背驰】MACD 柱面积比值判定动能衰竭", "div")
+        if dv != "none":
+            _kcn = "趋势背驰（强，对应一类买卖点）" if div.get("kind") == "trend" \
+                else "盘整背驰（弱，多为中枢震荡结束）"
+            put(f"  {'顶背驰（卖）' if dv == 'top' else '底背驰（买）'} · {_kcn}")
+            put(f"  面积 {div.get('prev_area', 0):.2f} → {div.get('last_area', 0):.2f}，"
+                f"力度比 {div.get('ratio', 1):.2f}（<0.8 为衰竭）")
+        else:
+            put("  暂无背驰：最近两段同向笔力度未衰竭", "dim")
+        put("")
+        put("【买卖点】", "h")
+        if tps:
+            for tp in sorted(tps, key=lambda x: -x["strength"]):
+                put(f"  {tp['name']}   强度 {tp['strength']:.0%}",
+                    "buy" if tp["type"] == "buy" else "sell")
+                put(f"    {tp.get('desc', '')}")
+                if tp.get("value") is not None:
+                    put(f"    锚定价 {tp['value']:.2f}（触发笔末端）", "dim")
+        else:
+            put("  暂无明确买卖点，等待背驰 / 三买三卖确认", "dim")
+        if strokes:
+            put("")
+            put("【最近笔】", "h")
+            for s in strokes[-5:]:
+                _d = "↑" if s["direction"] == "up" else "↓"
+                put(f"  {_d} {s['start'].get('day', '')[:10]} {s['start']['value']:.2f} → "
+                    f"{s['end'].get('day', '')[:10]} {s['end']['value']:.2f}", "dim")
+        tfs = ana.get("timeframes") or {}
+        if tfs:
+            put("")
+            put("【多级别联立】", "h")
+            _nm = {"monthly": "月线", "weekly": "周线", "daily": "日线",
+                   "4h": "4小时", "2h": "2小时", "1h": "1小时"}
+            for _k in ("monthly", "weekly", "daily", "4h", "2h", "1h"):
+                _r = tfs.get(_k)
+                if not _r:
+                    continue
+                put(f"  {_nm[_k]}：{_r.get('signal', '●观望')}  "
+                    f"{tmap.get(_r.get('trend', 'unknown'), '')}  "
+                    f"笔 {len(_r.get('strokes', []))} / 中枢 "
+                    f"{len(_r.get('std_pivots') or _r.get('pivots') or [])}")
+                _s1, _r1 = _r.get("nearest_support"), _r.get("nearest_resistance")
+                if _s1 or _r1:
+                    put((f"    支撑 {_s1:.2f} / 阻力 {_r1:.2f}" if (_s1 and _r1) else
+                         (f"    阻力 {_r1:.2f}" if _r1 else f"    支撑 {_s1:.2f}")), "dim")
+        put("")
+        put("【读图说明】", "h")
+        put("  ● 金色实线＝笔；青色粗虚线＝线段", "dim")
+        put("  ● 紫色带＝中枢，ZG/ZD 震荡区间，GG/DD 引力极限边界", "dim")
+        put("  ● 绿/红竖带＝背驰对比的两段同向笔，虚点线连接其极值", "dim")
+        put("  ● ▲=买点 ▼=卖点，虚线连回触发它的那一笔末端", "dim")
+        put("  ● 白虚线=现价，绿虚=最近支撑，红虚=最近阻力", "dim")
+        put("  ● 可用图表下方工具栏缩放 / 平移查看细节", "dim")
+        txt.config(state="disabled")
+
+        def _close_win():
+            try:
+                self._chart_windows.pop(code, None)
+            except Exception:
+                pass
+            try:
+                plt.close(fig)
+            except Exception:
+                pass
+            try:
+                win.destroy()
+            except Exception:
+                pass
+        win.protocol("WM_DELETE_WINDOW", _close_win)
 
     # ---- 数据加载与分析 ----
 
