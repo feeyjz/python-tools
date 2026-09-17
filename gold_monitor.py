@@ -4500,30 +4500,66 @@ class GoldMonitor:
         sys_frame.pack(fill="x", padx=2, pady=2)
         tk.Label(sys_frame, text="🧠 主脑/系统 实时状态（世界假说 × 缠论）", bg="#10243a",
                  fg="#FFD700", font=("Microsoft YaHei", 8, "bold")).pack(
-            side="top", anchor="w", padx=6, pady=(3, 1))
-        self.sys_status_lbl = tk.Label(sys_frame, text="系统状态: 加载中...", bg="#10243a",
+            side="top", anchor="w", padx=6, pady=(3, 2))
+        # ① 状态条（整行色带，醒目）
+        self.sys_status_lbl = tk.Label(sys_frame, text="⚡ 系统状态: 加载中...", bg="#26314a",
                                        fg="#888888", font=("Microsoft YaHei", 10, "bold"),
-                                       anchor="w")
-        self.sys_status_lbl.pack(side="top", fill="x", padx=6)
+                                       anchor="w", padx=8, pady=3)
+        self.sys_status_lbl.pack(side="top", fill="x", padx=6, pady=(0, 3))
+        # ② 三张资产卡并排（图标 + 角色 + 涨跌幅 + 双向仪表条 + 读数），填满宽度
+        self.sys_gauges = {}
+        self.sys_pct_lbls = {}
+        asset_row = tk.Frame(sys_frame, bg="#10243a")
+        asset_row.pack(side="top", fill="x", padx=6, pady=(0, 3))
+        asset_defs = [
+            ("gold",   "🥇 黄金", "核心算力 / 底层源代码", "#FFD700"),
+            ("oil",    "⛽ 原油", "物理引擎 / 服务器供电", "#FF9800"),
+            ("silver", "🥈 白银", "平民法力值 / 工业耗材", "#B0BEC5"),
+        ]
+        for key, title, role, accent in asset_defs:
+            card = tk.Frame(asset_row, bg="#16263c", relief="ridge", bd=1,
+                            highlightbackground=accent, highlightthickness=1)
+            card.pack(side="left", fill="both", expand=True, padx=3)
+            tk.Label(card, text=title, bg="#16263c", fg=accent,
+                     font=("Microsoft YaHei", 9, "bold"), anchor="w").pack(
+                side="top", fill="x", padx=6, pady=(3, 0))
+            tk.Label(card, text=role, bg="#16263c", fg="#7f8fa6",
+                     font=("Microsoft YaHei", 7), anchor="w").pack(
+                side="top", fill="x", padx=6, pady=(0, 1))
+            pct_lbl = tk.Label(card, text="--", bg="#16263c", fg="#888888",
+                               font=("Consolas", 12, "bold"), anchor="w")
+            pct_lbl.pack(side="top", fill="x", padx=6)
+            g = self._make_gauge(card, width=160, height=9)
+            g.pack(side="top", fill="x", padx=6, pady=(1, 2))
+            self.sys_gauges[key] = g
+            self.sys_pct_lbls[key] = pct_lbl
+            read_lbl = tk.Label(card, text="--", bg="#16263c", fg="#888888",
+                                font=("Microsoft YaHei", 8), anchor="w",
+                                justify="left", wraplength=210)
+            read_lbl.pack(side="top", fill="x", padx=6, pady=(0, 4))
+            if key == "gold":
+                self.sys_gold_lbl = read_lbl
+            elif key == "oil":
+                self.sys_oil_lbl = read_lbl
+            else:
+                self.sys_silver_lbl = read_lbl
+        # ③ 三张意图卡并排（图标 + 文案），填满宽度
         self.sys_intent_lbls = []
-        intent_box = tk.Frame(sys_frame, bg="#10243a")
-        intent_box.pack(side="top", fill="x", padx=6, pady=(1, 2))
-        for _ in range(3):
-            il = tk.Label(intent_box, text="• --", bg="#10243a", fg="#888888",
-                          font=("Microsoft YaHei", 8), anchor="w")
-            il.pack(side="top", fill="x")
+        intent_row = tk.Frame(sys_frame, bg="#10243a")
+        intent_row.pack(side="top", fill="x", padx=6, pady=(0, 4))
+        intent_icons = ["① 能源", "② 压制", "③ 叙事"]
+        for icon in intent_icons:
+            ic = tk.Frame(intent_row, bg="#16263c", relief="ridge", bd=1,
+                          highlightbackground="#4FC3F7", highlightthickness=1)
+            ic.pack(side="left", fill="both", expand=True, padx=3)
+            tk.Label(ic, text=icon, bg="#16263c", fg="#4FC3F7",
+                     font=("Microsoft YaHei", 8, "bold"), anchor="w").pack(
+                side="top", fill="x", padx=6, pady=(2, 0))
+            il = tk.Label(ic, text="--", bg="#16263c", fg="#888888",
+                          font=("Microsoft YaHei", 8), anchor="w",
+                          justify="left", wraplength=210)
+            il.pack(side="top", fill="x", padx=6, pady=(0, 4))
             self.sys_intent_lbls.append(il)
-        asset_box = tk.Frame(sys_frame, bg="#10243a")
-        asset_box.pack(side="top", fill="x", padx=6, pady=(0, 3))
-        self.sys_gold_lbl = tk.Label(asset_box, text="黄金(核心算力): --", bg="#10243a",
-                                     fg="#888888", font=("Microsoft YaHei", 8), anchor="w")
-        self.sys_gold_lbl.pack(side="top", fill="x")
-        self.sys_oil_lbl = tk.Label(asset_box, text="原油(服务器供电): --", bg="#10243a",
-                                    fg="#888888", font=("Microsoft YaHei", 8), anchor="w")
-        self.sys_oil_lbl.pack(side="top", fill="x")
-        self.sys_silver_lbl = tk.Label(asset_box, text="白银(法力值): --", bg="#10243a",
-                                       fg="#888888", font=("Microsoft YaHei", 8), anchor="w")
-        self.sys_silver_lbl.pack(side="top", fill="x")
         # 数据行
         self.data_frame = tk.Frame(self.main_frame, bg=self.BG)
         self.data_frame.pack(fill="both", expand=True)
@@ -5725,7 +5761,7 @@ class GoldMonitor:
         fw.attributes("-topmost", True)
         fw.attributes("-alpha", 0.95)
         fw.configure(bg="#1a1a2e")
-        fw.geometry("250x210+24+24")
+        fw.geometry("250x272+24+24")
         self.float_win = fw
         self._float_drag = {"x": 0, "y": 0}
 
@@ -5761,16 +5797,39 @@ class GoldMonitor:
             sig.pack(side="left", padx=4)
             self.float_rows[code] = {"price": price, "pct": pct, "sig": sig}
 
-        # 主脑/系统 状态与意图（世界假说 × 缠论）
-        tk.Frame(body, bg="#0f3460", height=1).pack(fill="x", pady=(5, 2))
-        self.float_sys_status = tk.Label(body, text="主脑: 加载中...", bg="#1a1a2e",
-                                         fg="#FFD700", font=("Microsoft YaHei", 9, "bold"),
-                                         anchor="w")
-        self.float_sys_status.pack(fill="x")
-        self.float_sys_intent = tk.Label(body, text="意图: --", bg="#1a1a2e",
-                                         fg="#FFD700", font=("Microsoft YaHei", 8),
-                                         anchor="w", wraplength=234, justify="left")
-        self.float_sys_intent.pack(fill="x")
+        # 主脑/系统 状态与意图（世界假说 × 缠论）——图文仪表盘版
+        tk.Frame(body, bg="#0f3460", height=1).pack(fill="x", pady=(5, 3))
+        tk.Label(body, text="🧠 主脑/系统", bg="#1a1a2e", fg="#FFD700",
+                 font=("Microsoft YaHei", 8, "bold"), anchor="w").pack(fill="x")
+        # 状态色条（整行，醒目）
+        self.float_sys_status = tk.Label(body, text="主脑: 加载中...", bg="#26314a",
+                                         fg="#888888", font=("Microsoft YaHei", 9, "bold"),
+                                         anchor="w", padx=4, pady=2)
+        self.float_sys_status.pack(fill="x", pady=(1, 3))
+        # 算力 / 供电 两个仪表条（黄金=核心算力，原油=服务器供电）
+        self.float_gauges = {}
+        self.float_pct_lbls = {}
+        for key, title, accent in [("gold", "🥇算力", "#FFD700"), ("oil", "⛽供电", "#FF9800")]:
+            row = tk.Frame(body, bg="#1a1a2e")
+            row.pack(fill="x", pady=1)
+            tk.Label(row, text=title, bg="#1a1a2e", fg=accent,
+                     font=("Microsoft YaHei", 8, "bold"), width=7, anchor="w").pack(
+                side="left")
+            pl = tk.Label(row, text="--", bg="#1a1a2e", fg="#888888",
+                          font=("Consolas", 9, "bold"), width=8, anchor="e")
+            pl.pack(side="left")
+            g = self._make_gauge(row, width=120, height=8)
+            g.pack(side="left", padx=3)
+            self.float_gauges[key] = g
+            self.float_pct_lbls[key] = pl
+        # 三条图标化意图，逐行显示
+        self.float_intent_lbls = []
+        for i, icon in enumerate(["①", "②", "③"]):
+            il = tk.Label(body, text=f"{icon} --", bg="#1a1a2e", fg="#888888",
+                          font=("Microsoft YaHei", 8), anchor="w",
+                          justify="left", wraplength=232)
+            il.pack(fill="x", pady=(1, 0))
+            self.float_intent_lbls.append(il)
 
     def _float_start_drag(self, event):
         self._float_drag = {"x": event.x, "y": event.y}
@@ -5913,11 +5972,43 @@ class GoldMonitor:
 
         return {
             "status": status, "status_color": scolor,
+            "gold_pct": g_pct, "oil_pct": o_pct, "silver_pct": s_pct,
             "intents": intents,
             "gold_read": g_read, "gold_color": g_color,
             "oil_read": o_read, "oil_color": o_color,
             "silver_read": s_read, "silver_color": s_color,
         }
+
+    def _make_gauge(self, parent, width=160, height=9):
+        """创建双向仪表条画布：中心为 0，向右为涨(红)、向左为跌(绿)"""
+        c = tk.Canvas(parent, width=width, height=height, bg="#0d1b2a",
+                      highlightthickness=0, bd=0)
+        return c
+
+    def _draw_gauge(self, c, pct, max_pct=5.0):
+        """绘制仪表条：轨道 + 中心刻度 + 按方向着色的填充"""
+        try:
+            if not c.winfo_exists():
+                return
+            w = int(float(c.cget("width")))
+            h = int(float(c.cget("height")))
+        except Exception:
+            return
+        c.delete("all")
+        cx = w / 2.0
+        half = w / 2.0 - 2
+        mag = min(abs(pct) / max_pct, 1.0) * half
+        # 中心刻度（金色）
+        c.create_rectangle(cx - 1, 0, cx + 1, h, fill="#FFD700", outline="")
+        if mag <= 0:
+            return
+        if pct >= 0:
+            x0, x1 = cx, cx + mag
+            color = "#FF1744" if pct >= 1.0 else "#FF8A80"
+        else:
+            x0, x1 = cx - mag, cx
+            color = "#00C853" if pct <= -1.0 else "#A5D6A7"
+        c.create_rectangle(x0, 1, x1, h - 1, fill=color, outline="")
 
     def _update_main_brain_ui(self):
         """刷新主窗口的『主脑/系统』面板（无标签则跳过）"""
@@ -5926,13 +6017,30 @@ class GoldMonitor:
         s = self.sys_state
         if not s:
             return
-        self.sys_status_lbl.config(text="系统状态: " + s["status"], fg=s["status_color"])
+        # 状态色带：背景随状态色加深，文字用亮色保证可读
+        sc = s["status_color"]
+        band_bg = {"#FF1744": "#5a0010", "#FF5252": "#5a1010",
+                   "#FFA500": "#5a3a00", "#4FC3F7": "#0d3a4d"}.get(sc, "#26314a")
+        self.sys_status_lbl.config(text="⚡ 系统状态: " + s["status"],
+                                   fg=sc, bg=band_bg)
+        # 资产卡：涨跌幅 + 仪表条 + 系统读数
+        for key, pct_key, color_key, read_key, lbl in [
+            ("gold", "gold_pct", "gold_color", "gold_read", self.sys_gold_lbl),
+            ("oil", "oil_pct", "oil_color", "oil_read", self.sys_oil_lbl),
+            ("silver", "silver_pct", "silver_color", "silver_read", self.sys_silver_lbl),
+        ]:
+            pct = s.get(pct_key, 0)
+            pl = self.sys_pct_lbls.get(key)
+            if pl is not None:
+                pl.config(text=f"{pct:+.2f}%", fg=self._change_colors(pct))
+            g = self.sys_gauges.get(key)
+            if g is not None:
+                self._draw_gauge(g, pct)
+            lbl.config(text=s[read_key], fg=s[color_key])
+        # 意图卡
         for i, (txt, col) in enumerate(s["intents"]):
             if i < len(self.sys_intent_lbls):
-                self.sys_intent_lbls[i].config(text="• " + txt, fg=col)
-        self.sys_gold_lbl.config(text="黄金(核心算力): " + s["gold_read"], fg=s["gold_color"])
-        self.sys_oil_lbl.config(text="原油(服务器供电): " + s["oil_read"], fg=s["oil_color"])
-        self.sys_silver_lbl.config(text="白银(法力值): " + s["silver_read"], fg=s["silver_color"])
+                self.sys_intent_lbls[i].config(text=txt, fg=col)
 
     def _update_float_sys(self):
         """刷新悬浮窗的『主脑/系统』状态与意图（无标签则跳过）"""
@@ -5941,10 +6049,24 @@ class GoldMonitor:
         s = self.sys_state
         if not s:
             return
-        self.float_sys_status.config(text="主脑: " + s["status"], fg=s["status_color"])
-        i0 = s["intents"][0][0] if len(s["intents"]) > 0 else ""
-        i1 = s["intents"][1][0] if len(s["intents"]) > 1 else ""
-        self.float_sys_intent.config(text="意图: " + i0 + " · " + i1, fg="#FFD700")
+        # 状态色条
+        sc = s["status_color"]
+        band_bg = {"#FF1744": "#5a0010", "#FF5252": "#5a1010",
+                   "#FFA500": "#5a3a00", "#4FC3F7": "#0d3a4d"}.get(sc, "#26314a")
+        self.float_sys_status.config(text="主脑: " + s["status"], fg=sc, bg=band_bg)
+        # 算力 / 供电 仪表条
+        for key, pct_key in [("gold", "gold_pct"), ("oil", "oil_pct")]:
+            pct = s.get(pct_key, 0)
+            pl = self.float_pct_lbls.get(key)
+            if pl is not None:
+                pl.config(text=f"{pct:+.2f}%", fg=self._change_colors(pct))
+            g = self.float_gauges.get(key)
+            if g is not None:
+                self._draw_gauge(g, pct)
+        # 三条意图（图标化逐行）
+        for i, (txt, col) in enumerate(s["intents"]):
+            if i < len(self.float_intent_lbls):
+                self.float_intent_lbls[i].config(text=f"{'①②③'[i]} {txt}", fg=col)
 
     def _update_float_window(self):
         if not hasattr(self, "float_win") or not self.float_win.winfo_exists():
