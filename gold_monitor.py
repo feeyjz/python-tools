@@ -4562,6 +4562,29 @@ class GoldMonitor:
                               justify="left", wraplength=210)
                 il.pack(side="top", fill="x", padx=6, pady=(0, 4))
                 self.sys_intent_cards.append((ic, cat_lbl, il))
+        # ④ 综合最终结果条：融合上面全部单条意图后的裁决
+        self.sys_verdict_lbl = tk.Label(sys_frame, text="⚖ 综合研判: 加载中...",
+                                        bg="#26314a", fg="#888888",
+                                        font=("Microsoft YaHei", 10, "bold"),
+                                        anchor="w", padx=8, pady=3)
+        self.sys_verdict_lbl.pack(side="top", fill="x", padx=6, pady=(0, 2))
+        sum_row = tk.Frame(sys_frame, bg="#10243a")
+        sum_row.pack(side="top", fill="x", padx=6, pady=(0, 2))
+        self.sys_summary_lbl = tk.Label(sum_row, text="--", bg="#10243a", fg="#cccccc",
+                                        font=("Microsoft YaHei", 8), anchor="w",
+                                        justify="left")
+        self.sys_summary_lbl.pack(side="left", fill="x", expand=True)
+        tk.Label(sum_row, text="主脑掌控", bg="#10243a", fg="#4FC3F7",
+                 font=("Microsoft YaHei", 8, "bold")).pack(side="right")
+        self.sys_control_lbl = tk.Label(sum_row, text="--", bg="#10243a", fg="#FFD700",
+                                        font=("Consolas", 9, "bold"), width=5, anchor="e")
+        self.sys_control_lbl.pack(side="right")
+        self.sys_control_bar = self._make_gauge(sum_row, width=120, height=9)
+        self.sys_control_bar.pack(side="right", padx=3)
+        self.sys_action_lbl = tk.Label(sys_frame, text="行动: --", bg="#10243a",
+                                       fg="#A5D6A7", font=("Microsoft YaHei", 8),
+                                       anchor="w", justify="left")
+        self.sys_action_lbl.pack(side="top", fill="x", padx=6, pady=(0, 4))
         # 数据行
         self.data_frame = tk.Frame(self.main_frame, bg=self.BG)
         self.data_frame.pack(fill="both", expand=True)
@@ -5763,7 +5786,7 @@ class GoldMonitor:
         fw.attributes("-topmost", True)
         fw.attributes("-alpha", 0.95)
         fw.configure(bg="#1a1a2e")
-        fw.geometry("250x272+24+24")
+        fw.geometry("250x320+24+24")
         self.float_win = fw
         self._float_drag = {"x": 0, "y": 0}
 
@@ -5824,14 +5847,33 @@ class GoldMonitor:
             g.pack(side="left", padx=3)
             self.float_gauges[key] = g
             self.float_pct_lbls[key] = pl
-        # 三条图标化意图，逐行显示
-        self.float_intent_lbls = []
-        for i, icon in enumerate(["①", "②", "③"]):
-            il = tk.Label(body, text=f"{icon} --", bg="#1a1a2e", fg="#888888",
-                          font=("Microsoft YaHei", 8), anchor="w",
-                          justify="left", wraplength=232)
-            il.pack(fill="x", pady=(1, 0))
-            self.float_intent_lbls.append(il)
+        # 综合最终结果（融合全部单条意图后的裁决，而非罗列前几条）
+        tk.Frame(body, bg="#0f3460", height=1).pack(fill="x", pady=(5, 2))
+        tk.Label(body, text="⚖ 综合研判（融合全部意图）", bg="#1a1a2e", fg="#FFD700",
+                 font=("Microsoft YaHei", 8, "bold"), anchor="w").pack(fill="x")
+        self.float_verdict_lbl = tk.Label(body, text="综合: 加载中...", bg="#26314a",
+                                          fg="#888888", font=("Microsoft YaHei", 9, "bold"),
+                                          anchor="w", padx=4, pady=2)
+        self.float_verdict_lbl.pack(fill="x", pady=(1, 2))
+        self.float_summary_lbl = tk.Label(body, text="--", bg="#1a1a2e", fg="#cccccc",
+                                          font=("Microsoft YaHei", 8), anchor="w",
+                                          justify="left", wraplength=232)
+        self.float_summary_lbl.pack(fill="x", pady=(0, 1))
+        # 主脑掌控力进度条
+        ctl_row = tk.Frame(body, bg="#1a1a2e")
+        ctl_row.pack(fill="x", pady=(1, 0))
+        tk.Label(ctl_row, text="掌控力", bg="#1a1a2e", fg="#4FC3F7",
+                 font=("Microsoft YaHei", 8, "bold"), width=6, anchor="w").pack(
+            side="left")
+        self.float_control_lbl = tk.Label(ctl_row, text="--", bg="#1a1a2e", fg="#FFD700",
+                                          font=("Consolas", 9, "bold"), width=5, anchor="e")
+        self.float_control_lbl.pack(side="left")
+        self.float_control_bar = self._make_gauge(ctl_row, width=118, height=8)
+        self.float_control_bar.pack(side="left", padx=3)
+        self.float_action_lbl = tk.Label(body, text="行动: --", bg="#1a1a2e", fg="#A5D6A7",
+                                         font=("Microsoft YaHei", 8), anchor="w",
+                                         justify="left", wraplength=232)
+        self.float_action_lbl.pack(fill="x", pady=(1, 2))
 
     def _float_start_drag(self, event):
         self._float_drag = {"x": event.x, "y": event.y}
@@ -6012,8 +6054,10 @@ class GoldMonitor:
             if d_code:
                 div_list.append((gname, pct_of(d_code) - sp, "内盘"))
         div_list.sort(key=lambda x: abs(x[1]), reverse=True)
+        div_gap = div_list[0][1] if div_list else 0.0
         if div_list:
-            gname, gap, kind = div_list[0]
+            gname, _gap, kind = div_list[0]
+            gap = div_gap
             if gap >= 1.5:
                 add_intent("🧩背离", f"{gname}{kind}强于现货{gap:+.1f}pct·内部资金抢跑·先知先觉者提前布局底层资产",
                            "#FFD700", 2)
@@ -6066,10 +6110,151 @@ class GoldMonitor:
             "status": status, "status_color": scolor,
             "gold_pct": g_pct, "oil_pct": o_pct, "silver_pct": s_pct,
             "intents": intents,
+            # 综合裁决：融合上面全部单条意图后的"最终结果"
+            "verdict": self._synthesize_verdict(intents, g_pct, o_pct, s_pct, g_sig, div_gap),
             "gold_read": g_read, "gold_color": g_color,
             "oil_read": o_read, "oil_color": o_color,
             "silver_read": s_read, "silver_color": s_color,
         }
+
+    def _synthesize_verdict(self, intents, g_pct, o_pct, s_pct, g_sig, div_gap=0.0):
+        """把全部单条意图融合成『综合最终结果』（方向感知）：
+        ① 系统压力 pressure：各条意图按优先级加权 → 定级 S/A/B/C/D
+        ② 主脑掌控力 control：只在"压制失败/失控"方向扣分（资金向底层算力迁移、
+           法力/能源失控、内部抢跑、剧烈波动），金价下跌=压制成功则不扣分
+        ③ 方向偏向 drift：黄金(核心算力)1.0 + 白银(法力)0.6 + 原油(能耗)0.4
+        ④ 由 pressure × drift 交叉给出最终定级、一句话研判与行动指引"""
+        # ① 系统压力：意图越紧急权重越高（prio 1~6），上界 18
+        weight = {1: 3.0, 2: 2.0, 3: 1.5, 4: 1.0, 5: 0.5, 6: 0.2}
+        pressure = sum(weight.get(it["prio"], 0.5) for it in intents)
+
+        # ② 主脑掌控力（100=完全掌控）：仅对"失控方向"扣分
+        loss = 0.0
+        # 黄金=核心算力：上行意味着资金向底层迁移、压制失败
+        if g_pct >= 1.0:
+            loss += 22 + min(g_pct - 1.0, 3.0) * 12
+        elif g_pct > 0:
+            loss += g_pct * 10
+        # 白银=平民法力值：逼空意味着能量垄断被打破
+        if s_pct >= 1.0:
+            loss += 10 + min(s_pct - 1.0, 3.0) * 5
+        elif s_pct > 0:
+            loss += s_pct * 3
+        # 原油=物理引擎能耗：过载意味着大战开启、能源失序
+        if o_pct >= 1.0:
+            loss += 8 + min(o_pct - 1.0, 3.0) * 4
+        # 股票/内盘抢跑：内部资金提前迁移，主脑被绕过
+        if div_gap >= 1.5:
+            loss += 10
+        elif div_gap >= 0.6:
+            loss += 4
+        # 剧烈波动：接近强制干预窗口
+        strength = max(abs(g_pct), abs(o_pct), abs(s_pct))
+        loss += min(strength, 4.0) * 3
+        control = int(max(8, min(100, 100 - loss)))
+
+        # ③ 方向偏向
+        drift = g_pct * 1.0 + s_pct * 0.6 + o_pct * 0.4
+        if drift >= 1.5:
+            bias = "底层资产多头共振·资金加速迁移"
+        elif drift >= 0.3:
+            bias = "算力资产温和偏多"
+        elif drift > -0.3:
+            bias = "多空均衡·方向未明"
+        elif drift > -1.5:
+            bias = "主脑压制占优·风险偏好回升"
+        else:
+            bias = "全面压制·现金为王"
+
+        # ④ 压力 × 方向 交叉定级
+        if pressure >= 12:
+            tier = "S"
+        elif pressure >= 8:
+            tier = "A"
+        elif pressure >= 5:
+            tier = "B"
+        elif pressure >= 3:
+            tier = "C"
+        else:
+            tier = "D"
+        if drift >= 0.3:      # —— 失守方向：资金向底层算力迁移，主脑压制失效
+            level_txt = {
+                "S": "失控暴涨·强制干预窗口开启",
+                "A": "信任危机外溢·主脑压制失效",
+                "B": "压制松动·资金持续向底层算力迁移",
+                "C": "算力温和走强·主脑轻度示弱",
+                "D": "算力小幅占优·主脑尚未出手压制",
+            }[tier]
+            color = {"S": "#FF1744", "A": "#FF5252", "B": "#FFA500",
+                     "C": "#FFD700", "D": "#FFD700"}[tier]
+        elif g_pct <= -0.5 and o_pct >= 0.5:
+            # —— 滞胀方向：能源上行而算力下行，主脑牺牲算力保物理引擎
+            level_txt = {
+                "S": "滞胀失控·能耗挤兑算力·系统濒临重构",
+                "A": "滞胀格局·主脑牺牲算力保住物理引擎",
+                "B": "能耗挤压·通胀抬头而底层算力被压制",
+                "C": "轻度能耗挤压·算力让位于通胀",
+                "D": "能耗温和上行·算力小幅让位",
+            }[tier]
+            color = {"S": "#FF1744", "A": "#FFA500", "B": "#FFA500",
+                     "C": "#FFD700", "D": "#FFD700"}[tier]
+        elif drift <= -0.3:   # —— 掌控方向：主脑压制成功，代价是能耗下降/通缩
+            level_txt = {
+                "S": "深度冰封·通缩式强制去杠杆清算",
+                "A": "压制成功·经济冰封节能待机",
+                "B": "压制占优·虚假风险偏好回升",
+                "C": "温和压制·系统低功耗运行",
+                "D": "轻度降频·系统平稳休眠",
+            }[tier]
+            color = {"S": "#FFA500", "A": "#4FC3F7", "B": "#4FC3F7",
+                     "C": "#4FC3F7", "D": "#4FC3F7"}[tier]
+        else:                 # —— 中性：多空撕裂 / 分区调节
+            level_txt = {
+                "S": "剧烈多空撕裂·系统濒临强制干预临界",
+                "A": "多线扰动共振·主脑被动救火调控",
+                "B": "板块分化加剧·分区动态调节配额",
+                "C": "板块轻微分化·主脑定向能量调度",
+                "D": "系统稳态·主脑例行巡检维稳",
+            }[tier]
+            color = {"S": "#FF1744", "A": "#FFA500", "B": "#FFD700",
+                     "C": "#FFD700", "D": "#4FC3F7"}[tier]
+        level = f"{tier} 级·{level_txt}"
+
+        # ⑤ 主导因素：取优先级最高的两条，用首段做短标签
+        ordered = sorted(intents, key=lambda x: x["prio"])[:2]
+        tags = [it["text"].split("·")[0].strip() for it in ordered]
+        summary = " + ".join(tags) + " ⇒ " + bias
+        # 缠论修正：买点≈玩家夺权，卖点≈主脑反扑
+        if "一买" in g_sig or "三买" in g_sig:
+            summary += "（缠论买点·玩家夺权窗口打开）"
+        elif "一卖" in g_sig or "二卖" in g_sig:
+            summary += "（缠论卖点·警惕主脑反扑清算）"
+
+        # ⑥ 行动指引：掌控力 + 方向 双维度
+        if control >= 75:
+            if drift <= -0.3:
+                action = "压制成功期：现金为王勿急于抄底，等待算力回流信号"
+            elif drift >= 0.3:
+                action = "温和偏多：轻仓跟随算力资产，留意主脑压制反扑"
+            else:
+                action = "稳态运行：轻仓区间操作，无需与主脑正面对抗"
+        elif control >= 55:
+            action = "扰动抬升：减仓观望，待方向确认再加仓，设好止损"
+        elif control >= 35:
+            if drift >= 0:
+                action = "压制松动：跟随黄金/白银底层算力，务必带止损防主脑突袭"
+            else:
+                action = "降频冰封期：观望为主勿盲目抄底，等待变压器重启信号"
+        else:
+            if drift <= -0.3:
+                action = "闪崩/冰封风险：严格控仓，勿接飞刀，保留现金弹药"
+            else:
+                action = "危机模式：控仓为王勿追高，警惕闪崩式干预与急速反抽"
+
+        return {"level": level, "color": color, "control": control,
+                "pressure": round(pressure, 1), "crisis": round(pressure, 1),
+                "drift": round(drift, 2), "summary": summary,
+                "action": action, "bias": bias}
 
     def _make_gauge(self, parent, width=160, height=9):
         """创建双向仪表条画布：中心为 0，向右为涨(红)、向左为跌(绿)"""
@@ -6101,6 +6286,35 @@ class GoldMonitor:
             x0, x1 = cx - mag, cx
             color = "#00C853" if pct <= -1.0 else "#A5D6A7"
         c.create_rectangle(x0, 1, x1, h - 1, fill=color, outline="")
+
+    def _draw_level_bar(self, c, ratio, fill=None):
+        """绘制 0~100 的单向水平条（用于『主脑掌控力』）：
+        ratio=0~1，颜色按掌控力自动分级：高=青(稳)，中=金，低=橙/红(失控)"""
+        try:
+            if not c.winfo_exists():
+                return
+            w = int(float(c.cget("width")))
+            h = int(float(c.cget("height")))
+        except Exception:
+            return
+        ratio = max(0.0, min(1.0, ratio))
+        c.delete("all")
+        # 轨道底色
+        c.create_rectangle(0, 0, w, h, fill="#0d1b2a", outline="")
+        if fill is None:
+            p = int(ratio * 100)
+            if p >= 75:
+                fill = "#4FC3F7"      # 主脑完全掌控：青
+            elif p >= 55:
+                fill = "#A5D6A7"      # 基本可控：浅绿
+            elif p >= 35:
+                fill = "#FFD700"      # 失守中：金
+            else:
+                fill = "#FF1744"      # 失控：深红
+        c.create_rectangle(0, 1, max(2, w * ratio), h - 1, fill=fill, outline="")
+        # 每 25% 一个刻度，便于目测
+        for k in (0.25, 0.5, 0.75):
+            c.create_rectangle(w * k, 0, w * k + 1, h, fill="#0f3460", outline="")
 
     def _update_main_brain_ui(self):
         """刷新主窗口的『主脑/系统』面板（无标签则跳过）"""
@@ -6141,6 +6355,24 @@ class GoldMonitor:
                     card.pack_forget()
             except Exception:
                 pass
+        # 综合最终结果条（融合全部单条意图）
+        v = s.get("verdict")
+        if v:
+            try:
+                band_bg = {"#FF1744": "#5a0010", "#FF5252": "#5a1010",
+                           "#FFA500": "#5a3a00", "#4FC3F7": "#0d3a4d"}.get(
+                               v["color"], "#26314a")
+                self.sys_verdict_lbl.config(
+                    text=f"⚖ 综合研判: {v['level']}   (压力 {v['pressure']}/18 · 偏向 {v['drift']:+.2f})",
+                    fg=v["color"], bg=band_bg)
+                self.sys_summary_lbl.config(text=v["summary"], fg="#dddddd")
+                self.sys_control_lbl.config(text=f"{v['control']}%")
+                bar = getattr(self, "sys_control_bar", None)
+                if bar is not None:
+                    self._draw_level_bar(bar, v["control"] / 100.0)
+                self.sys_action_lbl.config(text="行动: " + v["action"], fg="#A5D6A7")
+            except Exception:
+                pass
 
     def _update_float_sys(self):
         """刷新悬浮窗的『主脑/系统』状态与意图（无标签则跳过）"""
@@ -6163,11 +6395,21 @@ class GoldMonitor:
             g = self.float_gauges.get(key)
             if g is not None:
                 self._draw_gauge(g, pct)
-        # 悬浮窗空间有限，只显示优先级最高的 3 条意图
-        for i, it in enumerate(s["intents"][:3]):
-            if i < len(self.float_intent_lbls):
-                self.float_intent_lbls[i].config(
-                    text=f"{it['cat']} {it['text']}", fg=it["color"])
+        # 综合最终结果（由全部单条意图融合而来，替代原来的"前 3 条罗列"）
+        v = s.get("verdict")
+        if v:
+            band_bg = {"#FF1744": "#5a0010", "#FF5252": "#5a1010",
+                       "#FFA500": "#5a3a00", "#4FC3F7": "#0d3a4d"}.get(
+                           v["color"], "#26314a")
+            self.float_verdict_lbl.config(text="⚖ " + v["level"],
+                                          fg=v["color"], bg=band_bg)
+            self.float_summary_lbl.config(text=v["summary"], fg="#dddddd")
+            ratio = v["control"] / 100.0
+            self.float_control_lbl.config(text=f"{v['control']}%")
+            bar = getattr(self, "float_control_bar", None)
+            if bar is not None:
+                self._draw_level_bar(bar, ratio)
+            self.float_action_lbl.config(text="行动: " + v["action"], fg="#A5D6A7")
 
     def _update_float_window(self):
         if not hasattr(self, "float_win") or not self.float_win.winfo_exists():
