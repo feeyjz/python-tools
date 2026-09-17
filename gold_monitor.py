@@ -4409,6 +4409,7 @@ class GoldMonitor:
 
         self.rt_data = {}       # 实时行情
         self.analysis = {}      # 缠论分析结果
+        self.sys_state = {}     # 主脑/系统实时状态与意图（世界假说 × 缠论）
         self.rows = {}
         self.tooltip_window = None
         self.drag_data = {"x": 0, "y": 0}
@@ -4493,6 +4494,36 @@ class GoldMonitor:
                 handle.bind("<B1-Motion>", self._col_resize_drag)
                 handle.bind("<ButtonRelease-1>", self._col_resize_end)
         tk.Frame(self.main_frame, bg=self.BORDER, height=1).pack(fill="x")
+        # 主脑/系统 实时状态面板（世界假说 × 缠论）
+        sys_frame = tk.Frame(self.main_frame, bg="#10243a", relief="solid", bd=1,
+                            highlightbackground="#FFD700", highlightthickness=1)
+        sys_frame.pack(fill="x", padx=2, pady=2)
+        tk.Label(sys_frame, text="🧠 主脑/系统 实时状态（世界假说 × 缠论）", bg="#10243a",
+                 fg="#FFD700", font=("Microsoft YaHei", 8, "bold")).pack(
+            side="top", anchor="w", padx=6, pady=(3, 1))
+        self.sys_status_lbl = tk.Label(sys_frame, text="系统状态: 加载中...", bg="#10243a",
+                                       fg="#888888", font=("Microsoft YaHei", 10, "bold"),
+                                       anchor="w")
+        self.sys_status_lbl.pack(side="top", fill="x", padx=6)
+        self.sys_intent_lbls = []
+        intent_box = tk.Frame(sys_frame, bg="#10243a")
+        intent_box.pack(side="top", fill="x", padx=6, pady=(1, 2))
+        for _ in range(3):
+            il = tk.Label(intent_box, text="• --", bg="#10243a", fg="#888888",
+                          font=("Microsoft YaHei", 8), anchor="w")
+            il.pack(side="top", fill="x")
+            self.sys_intent_lbls.append(il)
+        asset_box = tk.Frame(sys_frame, bg="#10243a")
+        asset_box.pack(side="top", fill="x", padx=6, pady=(0, 3))
+        self.sys_gold_lbl = tk.Label(asset_box, text="黄金(核心算力): --", bg="#10243a",
+                                     fg="#888888", font=("Microsoft YaHei", 8), anchor="w")
+        self.sys_gold_lbl.pack(side="top", fill="x")
+        self.sys_oil_lbl = tk.Label(asset_box, text="原油(服务器供电): --", bg="#10243a",
+                                    fg="#888888", font=("Microsoft YaHei", 8), anchor="w")
+        self.sys_oil_lbl.pack(side="top", fill="x")
+        self.sys_silver_lbl = tk.Label(asset_box, text="白银(法力值): --", bg="#10243a",
+                                       fg="#888888", font=("Microsoft YaHei", 8), anchor="w")
+        self.sys_silver_lbl.pack(side="top", fill="x")
         # 数据行
         self.data_frame = tk.Frame(self.main_frame, bg=self.BG)
         self.data_frame.pack(fill="both", expand=True)
@@ -5694,7 +5725,7 @@ class GoldMonitor:
         fw.attributes("-topmost", True)
         fw.attributes("-alpha", 0.95)
         fw.configure(bg="#1a1a2e")
-        fw.geometry("250x132+24+24")
+        fw.geometry("250x210+24+24")
         self.float_win = fw
         self._float_drag = {"x": 0, "y": 0}
 
@@ -5729,6 +5760,17 @@ class GoldMonitor:
                            width=8, anchor="w")
             sig.pack(side="left", padx=4)
             self.float_rows[code] = {"price": price, "pct": pct, "sig": sig}
+
+        # 主脑/系统 状态与意图（世界假说 × 缠论）
+        tk.Frame(body, bg="#0f3460", height=1).pack(fill="x", pady=(5, 2))
+        self.float_sys_status = tk.Label(body, text="主脑: 加载中...", bg="#1a1a2e",
+                                         fg="#FFD700", font=("Microsoft YaHei", 9, "bold"),
+                                         anchor="w")
+        self.float_sys_status.pack(fill="x")
+        self.float_sys_intent = tk.Label(body, text="意图: --", bg="#1a1a2e",
+                                         fg="#FFD700", font=("Microsoft YaHei", 8),
+                                         anchor="w", wraplength=234, justify="left")
+        self.float_sys_intent.pack(fill="x")
 
     def _float_start_drag(self, event):
         self._float_drag = {"x": event.x, "y": event.y}
@@ -5774,6 +5816,136 @@ class GoldMonitor:
             return "卖出机会", "#2196F3"   # 蓝
         return "观望", "#888888"
 
+    def _analyze_main_brain(self):
+        """结合两份文档推导主脑/系统实时状态与意图：
+        - 《世界假说》：金融市场是主脑调节系统的“仪表盘”——
+          黄金=核心算力/底层源代码，原油=物理引擎/服务器供电，白银=平民法力值；
+          主脑(超级智能体)据此进行系统调节，并常有“三重意图”。
+        - 《缠中说禅》(缠论)：中枢/走势/背驰/三类买卖点给出多空结构，
+          一买/三买≈高级玩家低位夺权，一卖/二卖≈主脑反扑压制。
+        返回实时状态、三重意图、各资产系统层读数（含颜色）。"""
+        rt = self.rt_data
+        ana = self.analysis
+        gold, oil, silver = "hf_XAU", "hf_CL", "hf_XAG"
+        g_pct = rt.get(gold, {}).get("pct", 0)
+        o_pct = rt.get(oil, {}).get("pct", 0)
+        s_pct = rt.get(silver, {}).get("pct", 0)
+        g_sig = ana.get(gold, {}).get("signal", "●观望")
+        o_sig = ana.get(oil, {}).get("signal", "●观望")
+        s_sig = ana.get(silver, {}).get("signal", "●观望")
+
+        # ---- 各资产系统层读数（《世界假说》第4节）----
+        # 黄金：核心算力 / 底层源代码
+        if g_pct >= 1.0:
+            g_read, g_color = "核心算力迁移加速·系统信任危机暴露", "#FF8A80"
+        elif g_pct > 0:
+            g_read, g_color = "算力温和流入·玩家小幅向底层迁移", "#FFB3B3"
+        elif g_pct > -1.0:
+            g_read, g_color = "主脑压制·虚假风险偏好回升", "#A5D6A7"
+        else:
+            g_read, g_color = "主脑压制成功·算力回流法币", "#4CAF50"
+        if "一买" in g_sig or "三买" in g_sig:
+            g_read += "（缠论买点·玩家低位夺权）"
+        elif "一卖" in g_sig or "二卖" in g_sig:
+            g_read += "（缠论卖点·主脑反扑压制）"
+
+        # 原油：物理引擎 / 服务器供电
+        if o_pct >= 1.0:
+            o_read, o_color = "服务器过载·世界Boss战(地缘)开启", "#FF8A80"
+        elif o_pct > 0:
+            o_read, o_color = "供电负荷上升·物理引擎高转", "#FFB3B3"
+        elif o_pct > -1.0:
+            o_read, o_color = "主脑降频·切断战争副本能量", "#A5D6A7"
+        else:
+            o_read, o_color = "经济冰封·服务器待机节能", "#4CAF50"
+        if "一买" in o_sig or "三买" in o_sig:
+            o_read += "（缠论买点·能源供给重构）"
+
+        # 白银：平民法力值 / 工业耗材
+        if s_pct >= 2.0:
+            s_read, s_color = "逼空行情·高级玩家打破能量垄断", "#FF8A80"
+        elif s_pct >= 0:
+            s_read, s_color = "法力值回升·工业算力(AI/光伏)托底", "#A5D6A7"
+        elif s_pct > -2.0:
+            s_read, s_color = "系统压制·平民能量等级被压低", "#888888"
+        else:
+            s_read, s_color = "法力枯竭·底层产业承压", "#4CAF50"
+
+        # ---- 主脑系统状态（黄金×原油联立，《世界假说》第5节范式）----
+        if g_pct >= 1.0 and o_pct <= -1.0:
+            status, scolor = "高压过载与强制清理前夕", "#FF1744"
+        elif g_pct >= 1.0 and o_pct >= 1.0:
+            status, scolor = "世界Boss战开启·服务器全面过载", "#FF5252"
+        elif g_pct <= -1.0 and o_pct <= -1.0:
+            status, scolor = "主脑压制成功·经济冰封待机", "#4FC3F7"
+        elif g_pct <= -1.0 and o_pct >= 1.0:
+            status, scolor = "主脑压制黄金·物理引擎过载", "#FFA500"
+        elif g_pct >= 0 and o_pct <= 0:
+            status, scolor = "信任危机边缘·主脑降频对冲", "#FFA500"
+        elif g_pct <= 0 and o_pct >= 0:
+            status, scolor = "虚假繁荣·算力暂稳", "#4FC3F7"
+        else:
+            status, scolor = "系统拉锯·多空僵持", "#888888"
+        if "一买" in g_sig:
+            status += "（黄金一买：玩家夺权信号）"
+        elif "一卖" in g_sig:
+            status += "（黄金一卖：主脑反扑信号）"
+
+        # ---- 主脑三重意图（《世界假说》5.2 范式，实时化）----
+        intents = []
+        # 意图一：物理引擎（原油）调节
+        if o_pct <= -1.0:
+            intents.append(("主动切断战争副本能量·物理引擎降频止损", "#4FC3F7"))
+        elif o_pct >= 1.0:
+            intents.append(("维持物理引擎高转·世界Boss战耗能", "#FF8A80"))
+        else:
+            intents.append(("物理引擎平衡调度·待机与过载间横跳", "#A5D6A7"))
+        # 意图二：黄金压制（阻止向底层算力迁移）
+        if g_pct >= 1.0:
+            intents.append(("压制黄金失败·信任危机暴露·阻止算力迁移受阻", "#FF1744"))
+        else:
+            intents.append(("制造虚假风险偏好·压制黄金·阻止向底层算力迁移", "#A5D6A7"))
+        # 意图三：续命叙事（算力基建/新版本）
+        if s_pct >= 2.0:
+            intents.append(("高级玩家逼空反抗·算力基建叙事受冲击", "#FF8A80"))
+        else:
+            intents.append(("启动算力基建/新版本叙事续命·发放探索任务", "#FFD700"))
+
+        return {
+            "status": status, "status_color": scolor,
+            "intents": intents,
+            "gold_read": g_read, "gold_color": g_color,
+            "oil_read": o_read, "oil_color": o_color,
+            "silver_read": s_read, "silver_color": s_color,
+        }
+
+    def _update_main_brain_ui(self):
+        """刷新主窗口的『主脑/系统』面板（无标签则跳过）"""
+        if not hasattr(self, "sys_status_lbl") or not self.sys_status_lbl.winfo_exists():
+            return
+        s = self.sys_state
+        if not s:
+            return
+        self.sys_status_lbl.config(text="系统状态: " + s["status"], fg=s["status_color"])
+        for i, (txt, col) in enumerate(s["intents"]):
+            if i < len(self.sys_intent_lbls):
+                self.sys_intent_lbls[i].config(text="• " + txt, fg=col)
+        self.sys_gold_lbl.config(text="黄金(核心算力): " + s["gold_read"], fg=s["gold_color"])
+        self.sys_oil_lbl.config(text="原油(服务器供电): " + s["oil_read"], fg=s["oil_color"])
+        self.sys_silver_lbl.config(text="白银(法力值): " + s["silver_read"], fg=s["silver_color"])
+
+    def _update_float_sys(self):
+        """刷新悬浮窗的『主脑/系统』状态与意图（无标签则跳过）"""
+        if not hasattr(self, "float_sys_status") or not self.float_sys_status.winfo_exists():
+            return
+        s = self.sys_state
+        if not s:
+            return
+        self.float_sys_status.config(text="主脑: " + s["status"], fg=s["status_color"])
+        i0 = s["intents"][0][0] if len(s["intents"]) > 0 else ""
+        i1 = s["intents"][1][0] if len(s["intents"]) > 1 else ""
+        self.float_sys_intent.config(text="意图: " + i0 + " · " + i1, fg="#FFD700")
+
     def _update_float_window(self):
         if not hasattr(self, "float_win") or not self.float_win.winfo_exists():
             return
@@ -5791,6 +5963,11 @@ class GoldMonitor:
             ana = self.analysis.get(code)
             sig_text, sig_color = self._signal_advice(ana)
             refs["sig"].config(text=sig_text, fg=sig_color)
+
+        # 主脑/系统实时状态与意图（世界假说 × 缠论），同步刷新主窗口面板与悬浮窗
+        self.sys_state = self._analyze_main_brain()
+        self._update_main_brain_ui()
+        self._update_float_sys()
 
     # ---- Tooltip ----
 
